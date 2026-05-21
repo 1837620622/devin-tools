@@ -1,7 +1,12 @@
 #!/bin/bash
-# 统一 UTF-8 终端环境，降低中文输出在部分终端中的显示异常概率。
-export LANG="${LANG:-C.UTF-8}"
-export LC_ALL="${LC_ALL:-C.UTF-8}"
+# 统一 UTF-8 终端环境，针对 macOS 设为 en_US.UTF-8 以彻底解决乱码问题。
+if [ "$(uname)" = "Darwin" ]; then
+    export LANG="en_US.UTF-8"
+    export LC_ALL="en_US.UTF-8"
+else
+    export LANG="${LANG:-C.UTF-8}"
+    export LC_ALL="${LC_ALL:-C.UTF-8}"
+fi
 
 # ============================================================================
 # macOS 系统数据安全清理脚本
@@ -53,15 +58,46 @@ format_size() {
     fi
 }
 
-# 确认操作
+# 确认操作（直接回车即默认为 Yes）
 confirm() {
     local prompt="${1//？/?}"
-    printf "%b%s [y/N]: %b" "${YELLOW}" "$prompt" "${NC}"
+    printf "%b%s [Y/n]: %b" "${YELLOW}" "$prompt" "${NC}"
     read -r choice
     case "$choice" in
-        y|Y ) return 0;;
+        ""|[yY]|[yY][eE][sS]|[yY][eE] ) return 0;;
         * ) return 1;;
     esac
+}
+
+# 静默清理目录内容（保留目录本身，用于大类合并清理）
+silent_clean_dir() {
+    local dir="$1"
+    local desc="$2"
+    if [ -d "$dir" ]; then
+        local size=$(get_size_bytes "$dir")
+        if [ "$size" -gt 0 ]; then
+            echo -e "  ${CYAN}$desc${NC}: $(format_size $size)"
+            rm -rf "$dir"/* 2>/dev/null
+            rm -rf "$dir"/.[!.]* 2>/dev/null
+            TOTAL_FREED=$((TOTAL_FREED + size))
+            print_success "  已清理 $(format_size $size)"
+        fi
+    fi
+}
+
+# 静默删除整个目录（用于大类合并清理）
+silent_remove_dir() {
+    local dir="$1"
+    local desc="$2"
+    if [ -d "$dir" ]; then
+        local size=$(get_size_bytes "$dir")
+        if [ "$size" -gt 0 ]; then
+            echo -e "  ${CYAN}$desc${NC}: $(format_size $size)"
+            rm -rf "$dir" 2>/dev/null
+            TOTAL_FREED=$((TOTAL_FREED + size))
+            print_success "  已清理 $(format_size $size)"
+        fi
+    fi
 }
 
 # 安全删除目录内容（保留目录本身）
@@ -149,39 +185,38 @@ echo -e "\n${GREEN}${SECTION_BAR}${NC}"
 echo -e "${GREEN}  第一部分: 低风险清理（纯缓存，系统会自动重建）${NC}"
 echo -e "${GREEN}${SECTION_BAR}${NC}\n"
 
-# 1. 用户缓存目录（排除 iCloud / Apple 系统关键缓存）
-print_info "1. 用户应用缓存 (~/Library/Caches) [排除 iCloud/Apple 核心]"
-if [ -d "$HOME/Library/Caches" ]; then
-    # 需要保护的关键目录（删除它们会导致 iCloud 重新下载、Keychain 重建等副作用）
-    PROTECTED_CACHES=(
-        "com.apple.bird"                    # iCloud 文件提供程序
-        "CloudKit"                          # iCloud 同步缓存
-        "com.apple.nsurlsessiond"           # 后台下载
-        "FamilyCircle"                      # 家人共享
-        "com.apple.iCloudHelper"            # iCloud 助手
-        "com.apple.akd"                     # Apple ID 守护进程
-        "com.apple.Safari"                  # Safari 缓存（保留，统一在后面的 Safari 单项清理）
-        "Homebrew"                          # Homebrew 缓存（后面单独处理）
-        "com.apple.amsengagementd"          # Apple 媒体服务
-        "com.apple.appleaccountd"           # Apple 账户
-    )
-    # 计算可清理的总大小
-    USER_CACHE_CLEANABLE=0
-    for sub in "$HOME/Library/Caches"/*; do
-        [ ! -d "$sub" ] && continue
-        base=$(basename "$sub")
-        skip=0
-        for p in "${PROTECTED_CACHES[@]}"; do
-            if [ "$base" = "$p" ]; then skip=1; break; fi
+# 1. 用户基础应用缓存、系统日志与照片ML分析数据
+print_info "1. 用户基础应用缓存、系统日志与照片ML分析数据"
+print_warning "系统核心数据（如 iCloud/Apple 登录凭证等）已自动加以保护和隔离"
+if confirm "  是否清理用户应用缓存、日志以及照片ML分析数据？"; then
+    # 1.1 用户缓存目录（排除 iCloud / Apple 系统关键缓存）
+    if [ -d "$HOME/Library/Caches" ]; then
+        PROTECTED_CACHES=(
+            "com.apple.bird"                    # iCloud 文件提供程序
+            "CloudKit"                          # iCloud 同步缓存
+            "com.apple.nsurlsessiond"           # 后台下载
+            "FamilyCircle"                      # 家人共享
+            "com.apple.iCloudHelper"            # iCloud 助手
+            "com.apple.akd"                     # Apple ID 守护进程
+            "com.apple.Safari"                  # Safari 缓存（保留，统一在后面的 Safari 单项清理）
+            "Homebrew"                          # Homebrew 缓存（后面单独处理）
+            "com.apple.amsengagementd"          # Apple 媒体服务
+            "com.apple.appleaccountd"           # Apple 账户
+        )
+        USER_CACHE_CLEANABLE=0
+        for sub in "$HOME/Library/Caches"/*; do
+            [ ! -d "$sub" ] && continue
+            base=$(basename "$sub")
+            skip=0
+            for p in "${PROTECTED_CACHES[@]}"; do
+                if [ "$base" = "$p" ]; then skip=1; break; fi
+            done
+            [ "$skip" -eq 1 ] && continue
+            sz=$(get_size_bytes "$sub")
+            USER_CACHE_CLEANABLE=$((USER_CACHE_CLEANABLE + sz))
         done
-        [ "$skip" -eq 1 ] && continue
-        sz=$(get_size_bytes "$sub")
-        USER_CACHE_CLEANABLE=$((USER_CACHE_CLEANABLE + sz))
-    done
-    if [ "$USER_CACHE_CLEANABLE" -gt 0 ]; then
-        echo -e "  ${CYAN}可清理的用户缓存合计${NC}: $(format_size $USER_CACHE_CLEANABLE)"
-        echo -e "  ${GREEN}保护列表${NC}: ${PROTECTED_CACHES[*]}"
-        if confirm "  清理此项（自动保留 iCloud/Apple 关键缓存）？"; then
+        if [ "$USER_CACHE_CLEANABLE" -gt 0 ]; then
+            echo -e "  ${CYAN}用户应用缓存 (~/Library/Caches)${NC}: $(format_size $USER_CACHE_CLEANABLE)"
             for sub in "$HOME/Library/Caches"/*; do
                 [ ! -d "$sub" ] && continue
                 base=$(basename "$sub")
@@ -193,123 +228,86 @@ if [ -d "$HOME/Library/Caches" ]; then
                 rm -rf "$sub" 2>/dev/null
             done
             TOTAL_FREED=$((TOTAL_FREED + USER_CACHE_CLEANABLE))
-            print_success "  已清理 $(format_size $USER_CACHE_CLEANABLE)（iCloud/Apple 关键缓存已保留）"
-        else
-            print_info "  已跳过"
+            print_success "  用户应用缓存已清理（关键保护数据已保留）"
         fi
-    else
-        print_info "  没有可清理的用户缓存（或全部属于保护范围）"
     fi
+
+    # 1.2 用户日志目录
+    silent_clean_dir "$HOME/Library/Logs" "用户日志 (~/Library/Logs)"
+
+    # 1.3 Apple 照片分析缓存
+    MEDIA_ANALYSIS="$HOME/Library/Containers/com.apple.mediaanalysisd"
+    if [ -d "$MEDIA_ANALYSIS" ]; then
+        MEDIA_CACHE="$MEDIA_ANALYSIS/Data/Library/Caches"
+        if [ -d "$MEDIA_CACHE" ]; then
+            silent_clean_dir "$MEDIA_CACHE" "照片分析缓存"
+        else
+            size=$(get_size_bytes "$MEDIA_ANALYSIS")
+            if [ "$size" -gt 0 ]; then
+                echo -e "  ${CYAN}照片分析数据${NC}: $(format_size $size)"
+                rm -rf "$MEDIA_ANALYSIS/Data/Library" 2>/dev/null
+                TOTAL_FREED=$((TOTAL_FREED + size))
+                print_success "  照片分析数据已清理"
+            fi
+        fi
+    fi
+else
+    print_info "  已跳过系统基础缓存与日志清理"
 fi
 echo ""
 
-# 2. 用户日志目录
-print_info "2. 用户日志目录 (~/Library/Logs)"
-safe_clean_dir "$HOME/Library/Logs" "用户日志"
-echo ""
-
-# 3. Apple 照片分析缓存（3.1GB）
-print_info "3. Apple 照片分析缓存 (mediaanalysisd)"
-print_warning "删除后系统会在后台重新分析照片，不影响照片本身"
-MEDIA_ANALYSIS="$HOME/Library/Containers/com.apple.mediaanalysisd"
-if [ -d "$MEDIA_ANALYSIS" ]; then
-    # 只清理Data/Library/Caches部分
-    MEDIA_CACHE="$MEDIA_ANALYSIS/Data/Library/Caches"
-    if [ -d "$MEDIA_CACHE" ]; then
-        safe_clean_dir "$MEDIA_CACHE" "照片分析缓存"
-    else
-        # 如果没有Caches子目录，检查整体大小
-        size=$(get_size_bytes "$MEDIA_ANALYSIS")
-        echo -e "  ${CYAN}照片分析数据${NC}: $(format_size $size)"
-        print_info "  此目录包含照片ML分析数据，删除后系统会重新分析"
-        if confirm "  清理此项？"; then
-            rm -rf "$MEDIA_ANALYSIS/Data/Library" 2>/dev/null
-            TOTAL_FREED=$((TOTAL_FREED + size))
-            print_success "  已清理 $(format_size $size)"
-        else
-            print_info "  已跳过"
+# 2. 常用开发包管理与构建缓存 (Homebrew, npm, pip, Maven, Playwright)
+print_info "2. 开发包管理与构建工具缓存"
+print_warning "注意：Maven/Playwright 清理后在下次使用时需重新下载依赖/浏览器二进制包"
+if confirm "  是否清理开发工具缓存（Homebrew垃圾、npm/npx、pip、Maven依赖、Playwright、通用隐藏缓存）？"; then
+    # 2.1 Homebrew 缓存
+    if command -v brew &>/dev/null; then
+        BREW_CACHE=$(brew --cache 2>/dev/null)
+        if [ -n "$BREW_CACHE" ] && [ -d "$BREW_CACHE" ]; then
+            size=$(get_size_bytes "$BREW_CACHE")
+            echo -e "  ${CYAN}Homebrew 下载缓存${NC}: $(format_size $size)"
         fi
-    fi
-fi
-echo ""
-
-# 4. Homebrew 缓存清理
-print_info "4. Homebrew 缓存和旧版本"
-if command -v brew &>/dev/null; then
-    BREW_CACHE=$(brew --cache 2>/dev/null)
-    if [ -n "$BREW_CACHE" ] && [ -d "$BREW_CACHE" ]; then
-        size=$(get_size_bytes "$BREW_CACHE")
-        echo -e "  ${CYAN}Homebrew 下载缓存${NC}: $(format_size $size)"
-    fi
-    if confirm "  运行 brew cleanup（清理旧版本和缓存）？"; then
         before=$(df -k / | tail -1 | awk '{print $4}')
         brew cleanup --prune=all 2>/dev/null
         after=$(df -k / | tail -1 | awk '{print $4}')
         freed=$(( (after - before) * 1024 ))
         if [ "$freed" -gt 0 ]; then
             TOTAL_FREED=$((TOTAL_FREED + freed))
-            print_success "  已释放 $(format_size $freed)"
+            print_success "  Homebrew 释放了 $(format_size $freed)"
         else
             print_success "  Homebrew 缓存已是最新"
         fi
-    else
-        print_info "  已跳过"
     fi
-fi
-echo ""
 
-# 5. npm 缓存
-print_info "5. npm 缓存"
-NPM_CACHE="$HOME/.npm"
-if [ -d "$NPM_CACHE" ]; then
-    safe_clean_dir "$NPM_CACHE/_cacache" "npm 下载缓存"
-    # 清理npx缓存
-    safe_clean_dir "$NPM_CACHE/_npx" "npx 临时缓存"
-fi
-echo ""
-
-# 6. 通用隐藏缓存
-print_info "6. 通用隐藏缓存 (~/.cache 与 node-gyp)"
-safe_remove_dir "$HOME/.cache/codex-runtimes" "codex runtimes 下载缓存"
-safe_remove_dir "$HOME/.cache/uv" "uv 包缓存"
-safe_remove_dir "$HOME/.cache/selenium" "Selenium 驱动缓存"
-safe_remove_dir "$HOME/.cache/vscode-ripgrep" "VS Code ripgrep 缓存"
-safe_remove_dir "$HOME/.wdm" "WebDriver Manager 缓存"
-safe_remove_dir "$HOME/Library/Caches/node-gyp" "node-gyp 构建缓存"
-echo ""
-
-# 7. pip 缓存
-print_info "7. pip 缓存"
-PIP_CACHE="$HOME/Library/Caches/pip"
-if [ -d "$PIP_CACHE" ]; then
-    safe_clean_dir "$PIP_CACHE" "pip 下载缓存"
-fi
-echo ""
-
-# 8. Maven 缓存（旧仓库数据）
-print_info "8. Maven 本地仓库"
-M2_REPO="$HOME/.m2/repository"
-if [ -d "$M2_REPO" ]; then
-    size=$(get_size_bytes "$M2_REPO")
-    echo -e "  ${CYAN}Maven 本地仓库${NC}: $(format_size $size)"
-    print_warning "  清理后需重新下载依赖（如果你还在用Maven项目的话）"
-    if confirm "  清理此项？"; then
-        rm -rf "$M2_REPO" 2>/dev/null
-        TOTAL_FREED=$((TOTAL_FREED + size))
-        print_success "  已清理 $(format_size $size)"
-    else
-        print_info "  已跳过"
+    # 2.2 npm 缓存
+    NPM_CACHE="$HOME/.npm"
+    if [ -d "$NPM_CACHE" ]; then
+        silent_clean_dir "$NPM_CACHE/_cacache" "npm 下载缓存"
+        silent_clean_dir "$NPM_CACHE/_npx" "npx 临时缓存"
     fi
+
+    # 2.3 通用隐藏缓存 (安全过滤，不清理关键插件的依赖运行环境)
+    silent_remove_dir "$HOME/.cache/uv" "uv 包缓存"
+    silent_remove_dir "$HOME/.cache/selenium" "Selenium 驱动缓存"
+    silent_remove_dir "$HOME/.cache/vscode-ripgrep" "VS Code ripgrep 缓存"
+    silent_remove_dir "$HOME/.wdm" "WebDriver Manager 缓存"
+    silent_remove_dir "$HOME/Library/Caches/node-gyp" "node-gyp 构建缓存"
+
+    # 2.4 pip 缓存
+    silent_clean_dir "$HOME/Library/Caches/pip" "pip 下载缓存"
+
+    # 2.5 Maven 缓存
+    silent_remove_dir "$HOME/.m2/repository" "Maven 本地仓库"
+
+    # 2.6 Playwright 浏览器缓存
+    silent_remove_dir "$HOME/Library/Caches/ms-playwright" "Playwright 浏览器"
+else
+    print_info "  已跳过开发工具缓存清理"
 fi
 echo ""
 
-# 9. Playwright 浏览器缓存
-print_info "9. Playwright 浏览器缓存"
-safe_remove_dir "$HOME/Library/Caches/ms-playwright" "Playwright 浏览器"
-echo ""
-
-# 10. DNS 缓存
-print_info "10. DNS 缓存刷新"
+# 3. DNS 缓存刷新
+print_info "3. DNS 缓存刷新"
 if confirm "  刷新 DNS 缓存？"; then
     sudo dscacheutil -flushcache 2>/dev/null
     sudo killall -HUP mDNSResponder 2>/dev/null
@@ -326,208 +324,186 @@ echo -e "\n${YELLOW}${SECTION_BAR}${NC}"
 echo -e "${YELLOW}  第二部分: 中等风险清理（应用缓存，建议先关闭对应应用）${NC}"
 echo -e "${YELLOW}${SECTION_BAR}${NC}\n"
 
-# 11. 微信缓存
+# 11. 微信缓存（合并一键清理，不影响聊天记录）
 print_info "11. 微信缓存"
 WECHAT_CONTAINER="$HOME/Library/Containers/com.tencent.xinWeChat"
 if [ -d "$WECHAT_CONTAINER" ]; then
-    size=$(get_size_bytes "$WECHAT_CONTAINER")
-    echo -e "  ${CYAN}微信容器数据${NC}: $(format_size $size)"
-    
     WECHAT_DATA="$WECHAT_CONTAINER/Data/Library/Application Support/com.tencent.xinWeChat"
     WECHAT_CACHE="$WECHAT_CONTAINER/Data/Library/Caches"
     WECHAT_TMP="$WECHAT_CONTAINER/Data/tmp"
     
-    CLEANED=0
-    
-    if [ -d "$WECHAT_CACHE" ]; then
-        cache_size=$(get_size_bytes "$WECHAT_CACHE")
-        if [ "$cache_size" -gt 0 ]; then
-            echo -e "    ${CYAN}缓存目录${NC}: $(format_size $cache_size)"
-            if confirm "    清理缓存目录？"; then
-                rm -rf "$WECHAT_CACHE"/* 2>/dev/null
-                rm -rf "$WECHAT_CACHE"/.[!.]* 2>/dev/null
-                TOTAL_FREED=$((TOTAL_FREED + cache_size))
-                CLEANED=1
-                print_success "    缓存已清理"
-            fi
-        fi
-    fi
-    
-    if [ -d "$WECHAT_TMP" ]; then
-        tmp_size=$(get_size_bytes "$WECHAT_TMP")
-        if [ "$tmp_size" -gt 0 ]; then
-            echo -e "    ${CYAN}临时文件${NC}: $(format_size $tmp_size)"
-            if confirm "    清理临时文件？"; then
-                rm -rf "$WECHAT_TMP"/* 2>/dev/null
-                rm -rf "$WECHAT_TMP"/.[!.]* 2>/dev/null
-                TOTAL_FREED=$((TOTAL_FREED + tmp_size))
-                CLEANED=1
-                print_success "    临时文件已清理"
-            fi
-        fi
-    fi
+    WECHAT_CLEANABLE=0
+    [ -d "$WECHAT_CACHE" ] && WECHAT_CLEANABLE=$((WECHAT_CLEANABLE + $(get_size_bytes "$WECHAT_CACHE")))
+    [ -d "$WECHAT_TMP" ] && WECHAT_CLEANABLE=$((WECHAT_CLEANABLE + $(get_size_bytes "$WECHAT_TMP")))
     
     if [ -d "$WECHAT_DATA" ]; then
         MSG_TEMP="$WECHAT_DATA/2.0b4.0.1.15/Message/MessageTemp"
         FILE_CACHE="$WECHAT_DATA/2.0b4.0.0.15/FileStorage/Cache"
         IMAGE_CACHE="$WECHAT_DATA/2.0b4.0.0.15/FileStorage/ImageCache"
         VIDEO_CACHE="$WECHAT_DATA/2.0b4.0.0.15/FileStorage/VideoCache"
-        
         for cache_dir in "$MSG_TEMP" "$FILE_CACHE" "$IMAGE_CACHE" "$VIDEO_CACHE"; do
-            if [ -d "$cache_dir" ]; then
-                cache_size=$(get_size_bytes "$cache_dir")
-                if [ "$cache_size" -gt 0 ]; then
-                    dir_name=$(basename "$cache_dir")
-                    echo -e "    ${CYAN}$dir_name${NC}: $(format_size $cache_size)"
-                    if confirm "    清理 $dir_name？"; then
-                        rm -rf "$cache_dir"/* 2>/dev/null
-                        rm -rf "$cache_dir"/.[!.]* 2>/dev/null
-                        TOTAL_FREED=$((TOTAL_FREED + cache_size))
-                        CLEANED=1
-                        print_success "    $dir_name 已清理"
-                    fi
-                fi
-            fi
+            [ -d "$cache_dir" ] && WECHAT_CLEANABLE=$((WECHAT_CLEANABLE + $(get_size_bytes "$cache_dir")))
         done
     fi
     
-    if [ "$CLEANED" -eq 0 ]; then
-        print_info "  无可清理项或已跳过"
+    if [ "$WECHAT_CLEANABLE" -gt 0 ]; then
+        echo -e "  ${CYAN}微信可清理缓存与临时文件${NC}: $(format_size $WECHAT_CLEANABLE)"
+        if confirm "  是否清理微信缓存（包含临时文件、图片及视频缓存等，不影响聊天记录）？"; then
+            # ----------------------------------------------------------------
+            # 级联静默清理所有子目录，确保交互流畅
+            # ----------------------------------------------------------------
+            silent_clean_dir "$WECHAT_CACHE" "微信缓存目录"
+            silent_clean_dir "$WECHAT_TMP" "微信临时文件"
+            if [ -d "$WECHAT_DATA" ]; then
+                silent_clean_dir "$MSG_TEMP" "微信临时消息文件"
+                silent_clean_dir "$FILE_CACHE" "微信文件存储缓存"
+                silent_clean_dir "$IMAGE_CACHE" "微信图片缓存"
+                silent_clean_dir "$VIDEO_CACHE" "微信视频缓存"
+            fi
+            print_success "  微信缓存清理完成"
+        else
+            print_info "  已跳过微信缓存清理"
+        fi
+    else
+        print_info "  未检测到微信可清理的缓存数据"
     fi
 fi
 echo ""
 
-# 12. WPS 缓存
+# 12. WPS Office 缓存（合并一键清理）
 print_info "12. WPS Office 缓存"
 WPS_CONTAINER="$HOME/Library/Containers/com.kingsoft.wpsoffice.mac"
 if [ -d "$WPS_CONTAINER" ]; then
     WPS_CACHE="$WPS_CONTAINER/Data/Library/Caches"
-    if [ -d "$WPS_CACHE" ]; then
-        safe_clean_dir "$WPS_CACHE" "WPS 缓存"
-    fi
     WPS_TMP="$WPS_CONTAINER/Data/tmp"
-    if [ -d "$WPS_TMP" ]; then
-        safe_clean_dir "$WPS_TMP" "WPS 临时文件"
+    WPS_CLEANABLE=0
+    [ -d "$WPS_CACHE" ] && WPS_CLEANABLE=$((WPS_CLEANABLE + $(get_size_bytes "$WPS_CACHE")))
+    [ -d "$WPS_TMP" ] && WPS_CLEANABLE=$((WPS_CLEANABLE + $(get_size_bytes "$WPS_TMP")))
+    
+    if [ "$WPS_CLEANABLE" -gt 0 ]; then
+        echo -e "  ${CYAN}WPS Office 可清理缓存${NC}: $(format_size $WPS_CLEANABLE)"
+        if confirm "  是否清理 WPS Office 缓存与临时文件？"; then
+            silent_clean_dir "$WPS_CACHE" "WPS 缓存"
+            silent_clean_dir "$WPS_TMP" "WPS 临时文件"
+            print_success "  WPS Office 缓存清理完成"
+        else
+            print_info "  已跳过 WPS Office 缓存清理"
+        fi
+    else
+        print_info "  未检测到 WPS Office 可清理的缓存数据"
     fi
 fi
 echo ""
 
-# 13. Telegram 缓存
+# 13. Telegram 缓存（合并一键清理）
 print_info "13. Telegram 缓存"
 TG_CACHE="$HOME/Library/Group Containers/6N38VWS5BX.ru.keepcoder.Telegram"
 if [ -d "$TG_CACHE" ]; then
     size=$(get_size_bytes "$TG_CACHE")
-    echo -e "  ${CYAN}Telegram 数据${NC}: $(format_size $size)"
-    if confirm "  清理 Telegram 缓存文件？"; then
-        find "$TG_CACHE" -name "Caches" -type d -exec rm -rf {} + 2>/dev/null
-        find "$TG_CACHE" -name "tmp" -type d -exec rm -rf {} + 2>/dev/null
-        print_success "  已清理 Telegram 缓存"
+    if [ "$size" -gt 0 ]; then
+        echo -e "  ${CYAN}Telegram 容器数据${NC}: $(format_size $size)"
+        if confirm "  是否清理 Telegram 缓存与临时文件？"; then
+            find "$TG_CACHE" -name "Caches" -type d -exec rm -rf {} + 2>/dev/null
+            find "$TG_CACHE" -name "tmp" -type d -exec rm -rf {} + 2>/dev/null
+            print_success "  已清理 Telegram 缓存"
+        else
+            print_info "  已跳过 Telegram 缓存清理"
+        fi
     else
-        print_info "  已跳过"
+        print_info "  未检测到 Telegram 可清理缓存"
     fi
 fi
 echo ""
 
-# 14. QQ 缓存
+# 14. QQ 缓存（合并一键清理，不影响聊天记录）
 print_info "14. QQ 缓存"
 QQ_CONTAINER="$HOME/Library/Containers/com.tencent.qq"
 if [ -d "$QQ_CONTAINER" ]; then
-    size=$(get_size_bytes "$QQ_CONTAINER")
-    echo -e "  ${CYAN}QQ容器数据${NC}: $(format_size $size)"
-
     QQ_CACHE="$QQ_CONTAINER/Data/Library/Caches"
     QQ_TMP="$QQ_CONTAINER/Data/tmp"
-
-    CLEANED=0
-
-    if [ -d "$QQ_CACHE" ]; then
-        cache_size=$(get_size_bytes "$QQ_CACHE")
-        if [ "$cache_size" -gt 0 ]; then
-            echo -e "    ${CYAN}缓存目录${NC}: $(format_size $cache_size)"
-            if confirm "    清理缓存目录？"; then
-                rm -rf "$QQ_CACHE"/* 2>/dev/null
-                rm -rf "$QQ_CACHE"/.[!.]* 2>/dev/null
-                TOTAL_FREED=$((TOTAL_FREED + cache_size))
-                CLEANED=1
-                print_success "    缓存已清理"
-            fi
-        fi
-    fi
-
-    if [ -d "$QQ_TMP" ]; then
-        tmp_size=$(get_size_bytes "$QQ_TMP")
-        if [ "$tmp_size" -gt 0 ]; then
-            echo -e "    ${CYAN}临时文件${NC}: $(format_size $tmp_size)"
-            if confirm "    清理临时文件？"; then
-                rm -rf "$QQ_TMP"/* 2>/dev/null
-                rm -rf "$QQ_TMP"/.[!.]* 2>/dev/null
-                TOTAL_FREED=$((TOTAL_FREED + tmp_size))
-                CLEANED=1
-                print_success "    临时文件已清理"
-            fi
-        fi
-    fi
-
     QQ_DATA="$QQ_CONTAINER/Data/Library/Application Support/QQ"
+    
+    QQ_CLEANABLE=0
+    [ -d "$QQ_CACHE" ] && QQ_CLEANABLE=$((QQ_CLEANABLE + $(get_size_bytes "$QQ_CACHE")))
+    [ -d "$QQ_TMP" ] && QQ_CLEANABLE=$((QQ_CLEANABLE + $(get_size_bytes "$QQ_TMP")))
     if [ -d "$QQ_DATA" ]; then
         IMAGE_CACHE="$QQ_DATA/Image"
         FILE_CACHE="$QQ_DATA/FileRecv"
         LOG_CACHE="$QQ_DATA/Logs"
-
         for cache_dir in "$IMAGE_CACHE" "$FILE_CACHE" "$LOG_CACHE"; do
-            if [ -d "$cache_dir" ]; then
-                cache_size=$(get_size_bytes "$cache_dir")
-                if [ "$cache_size" -gt 0 ]; then
-                    dir_name=$(basename "$cache_dir")
-                    echo -e "    ${CYAN}$dir_name${NC}: $(format_size $cache_size)"
-                    if confirm "    清理 $dir_name？"; then
-                        rm -rf "$cache_dir"/* 2>/dev/null
-                        rm -rf "$cache_dir"/.[!.]* 2>/dev/null
-                        TOTAL_FREED=$((TOTAL_FREED + cache_size))
-                        CLEANED=1
-                        print_success "    $dir_name 已清理"
-                    fi
-                fi
-            fi
+            [ -d "$cache_dir" ] && QQ_CLEANABLE=$((QQ_CLEANABLE + $(get_size_bytes "$cache_dir")))
         done
     fi
-
-    if [ "$CLEANED" -eq 0 ]; then
-        print_info "  无可清理项或已跳过"
+    
+    if [ "$QQ_CLEANABLE" -gt 0 ]; then
+        echo -e "  ${CYAN}QQ 可清理缓存与临时文件${NC}: $(format_size $QQ_CLEANABLE)"
+        if confirm "  是否清理 QQ 缓存（包含临时文件、接收图片、日志等，不影响聊天记录）？"; then
+            silent_clean_dir "$QQ_CACHE" "QQ缓存目录"
+            silent_clean_dir "$QQ_TMP" "QQ临时文件"
+            if [ -d "$QQ_DATA" ]; then
+                silent_clean_dir "$IMAGE_CACHE" "QQ图片缓存"
+                silent_clean_dir "$FILE_CACHE" "QQ文件接收缓存"
+                silent_clean_dir "$LOG_CACHE" "QQ日志缓存"
+            fi
+            print_success "  QQ 缓存清理完成"
+        else
+            print_info "  已跳过 QQ 缓存清理"
+        fi
+    else
+        print_info "  未检测到 QQ 可清理的缓存数据"
     fi
 fi
 echo ""
 
-# 15. Google Chrome 缓存
+# 15. Google Chrome 缓存（合并一键清理）
 print_info "15. Google Chrome 缓存"
-CHROME_CACHE="$HOME/Library/Application Support/Google/Chrome/Default/Service Worker"
-CHROME_CACHE2="$HOME/Library/Application Support/Google/Chrome/Default/Cache"
-CHROME_CODE="$HOME/Library/Application Support/Google/Chrome/Default/Code Cache"
-CHROME_COMPONENT="$HOME/Library/Application Support/Google/Chrome/component_crx_cache"
-CHROME_SODA_LANG="$HOME/Library/Application Support/Google/Chrome/SODALanguagePacks"
-CHROME_SODA="$HOME/Library/Application Support/Google/Chrome/SODA"
-CHROME_MODEL="$HOME/Library/Application Support/Google/Chrome/optimization_guide_model_store"
-CHROME_GR_SHADER="$HOME/Library/Application Support/Google/Chrome/GrShaderCache"
-CHROME_GRAPHITE="$HOME/Library/Application Support/Google/Chrome/GraphiteDawnCache"
-CHROME_SHADER="$HOME/Library/Application Support/Google/Chrome/ShaderCache"
-CHROME_BROWSER_METRICS="$HOME/Library/Application Support/Google/Chrome/BrowserMetrics"
-CHROME_SNAPSHOTS="$HOME/Library/Application Support/Google/Chrome/Snapshots"
-CHROME_EXT_CRX="$HOME/Library/Application Support/Google/Chrome/extensions_crx_cache"
-CHROME_CRASHPAD="$HOME/Library/Application Support/Google/Chrome/Crashpad"
-safe_remove_dir "$CHROME_CACHE" "Chrome Service Worker 缓存"
-safe_remove_dir "$CHROME_CACHE2" "Chrome 网页缓存"
-safe_remove_dir "$CHROME_CODE" "Chrome 代码缓存"
-safe_remove_dir "$CHROME_COMPONENT" "Chrome 组件下载缓存"
-safe_remove_dir "$CHROME_SODA_LANG" "Chrome 语音语言包缓存"
-safe_remove_dir "$CHROME_SODA" "Chrome 语音模型缓存"
-safe_remove_dir "$CHROME_MODEL" "Chrome 优化模型缓存"
-safe_remove_dir "$CHROME_GR_SHADER" "Chrome GrShader 缓存"
-safe_remove_dir "$CHROME_GRAPHITE" "Chrome GraphiteDawn 缓存"
-safe_remove_dir "$CHROME_SHADER" "Chrome Shader 缓存"
-safe_remove_dir "$CHROME_BROWSER_METRICS" "Chrome BrowserMetrics 缓存"
-safe_remove_dir "$CHROME_SNAPSHOTS" "Chrome Snapshots 缓存"
-safe_remove_dir "$CHROME_EXT_CRX" "Chrome 扩展安装包缓存"
-safe_remove_dir "$CHROME_CRASHPAD" "Chrome Crashpad 缓存"
+CHROME_DIR="$HOME/Library/Application Support/Google/Chrome"
+if [ -d "$CHROME_DIR" ]; then
+    CHROME_CACHE="$CHROME_DIR/Default/Service Worker"
+    CHROME_CACHE2="$CHROME_DIR/Default/Cache"
+    CHROME_CODE="$CHROME_DIR/Default/Code Cache"
+    CHROME_COMPONENT="$CHROME_DIR/component_crx_cache"
+    CHROME_SODA_LANG="$CHROME_DIR/SODALanguagePacks"
+    CHROME_SODA="$CHROME_DIR/SODA"
+    CHROME_MODEL="$CHROME_DIR/optimization_guide_model_store"
+    CHROME_GR_SHADER="$CHROME_DIR/GrShaderCache"
+    CHROME_GRAPHITE="$CHROME_DIR/GraphiteDawnCache"
+    CHROME_SHADER="$CHROME_DIR/ShaderCache"
+    CHROME_BROWSER_METRICS="$CHROME_DIR/BrowserMetrics"
+    CHROME_SNAPSHOTS="$CHROME_DIR/Snapshots"
+    CHROME_EXT_CRX="$CHROME_DIR/extensions_crx_cache"
+    CHROME_CRASHPAD="$CHROME_DIR/Crashpad"
+
+    CHROME_CLEANABLE=0
+    for cache_dir in "$CHROME_CACHE" "$CHROME_CACHE2" "$CHROME_CODE" "$CHROME_COMPONENT" "$CHROME_SODA_LANG" "$CHROME_SODA" "$CHROME_MODEL" "$CHROME_GR_SHADER" "$CHROME_GRAPHITE" "$CHROME_SHADER" "$CHROME_BROWSER_METRICS" "$CHROME_SNAPSHOTS" "$CHROME_EXT_CRX" "$CHROME_CRASHPAD"; do
+        [ -d "$cache_dir" ] && CHROME_CLEANABLE=$((CHROME_CLEANABLE + $(get_size_bytes "$cache_dir")))
+    done
+
+    if [ "$CHROME_CLEANABLE" -gt 0 ]; then
+        echo -e "  ${CYAN}Chrome 可清理缓存${NC}: $(format_size $CHROME_CLEANABLE)"
+        if confirm "  是否清理 Google Chrome 缓存与临时文件（包含网页缓存、渲染器/着色器缓存等 14 项）？"; then
+            silent_remove_dir "$CHROME_CACHE" "Chrome Service Worker 缓存"
+            silent_remove_dir "$CHROME_CACHE2" "Chrome 网页缓存"
+            silent_remove_dir "$CHROME_CODE" "Chrome 代码缓存"
+            silent_remove_dir "$CHROME_COMPONENT" "Chrome 组件下载缓存"
+            silent_remove_dir "$CHROME_SODA_LANG" "Chrome 语音语言包缓存"
+            silent_remove_dir "$CHROME_SODA" "Chrome 语音模型缓存"
+            silent_remove_dir "$CHROME_MODEL" "Chrome 优化模型缓存"
+            silent_remove_dir "$CHROME_GR_SHADER" "Chrome GrShader 缓存"
+            silent_remove_dir "$CHROME_GRAPHITE" "Chrome GraphiteDawn 缓存"
+            silent_remove_dir "$CHROME_SHADER" "Chrome Shader 缓存"
+            silent_remove_dir "$CHROME_BROWSER_METRICS" "Chrome BrowserMetrics 缓存"
+            silent_remove_dir "$CHROME_SNAPSHOTS" "Chrome Snapshots 缓存"
+            silent_remove_dir "$CHROME_EXT_CRX" "Chrome 扩展安装包缓存"
+            silent_remove_dir "$CHROME_CRASHPAD" "Chrome Crashpad 缓存"
+            print_success "  Google Chrome 缓存清理完成"
+        else
+            print_info "  已跳过 Google Chrome 缓存清理"
+        fi
+    else
+        print_info "  未检测到 Google Chrome 可清理缓存"
+    fi
+fi
 echo ""
 
 # 16. 系统级桌面图片缓存
@@ -535,84 +511,97 @@ print_info "16. 桌面图片缓存 (/Library/Caches/Desktop Pictures)"
 safe_remove_dir "/Library/Caches/Desktop Pictures" "桌面图片缓存"
 echo ""
 
-# 17. Windsurf 缓存（完整版，针对"对话长卡顿"专项优化）
+# 17. Windsurf IDE 缓存（合并一键清理，针对"对话长卡顿"专项优化）
 print_info "17. Windsurf IDE 缓存（针对对话长卡顿专项优化）"
 WS_DIR="$HOME/Library/Application Support/Windsurf"
 if [ -d "$WS_DIR" ]; then
     echo -e "  ${GREEN}[保留]${NC} cascade/*.pb（对话历史）、memories、skills、mcp_config.json"
     echo -e "  ${GREEN}[保留]${NC} Cookies*、Local Storage、WebStorage、installation_id、machineid（登录态）"
     echo -e "  ${GREEN}[保留]${NC} settings.json / keybindings.json（个人编辑器设置）"
-    echo ""
-
-    # ── Electron 内核缓存（完全安全，系统会重建） ─────────────────────
-    safe_remove_dir "$WS_DIR/Cache" "Windsurf Cache（浏览器缓存）"
-    safe_remove_dir "$WS_DIR/CachedData" "Windsurf CachedData（编译缓存）"
-    safe_remove_dir "$WS_DIR/GPUCache" "Windsurf GPUCache"
-    safe_remove_dir "$WS_DIR/Code Cache" "Windsurf Code Cache"
-    safe_remove_dir "$WS_DIR/DawnWebGPUCache" "Windsurf DawnWebGPUCache"
-    safe_remove_dir "$WS_DIR/DawnGraphiteCache" "Windsurf DawnGraphiteCache"
-    safe_remove_dir "$WS_DIR/Shared Dictionary" "Windsurf Shared Dictionary"
-
-    # ── UI / 脚本缓存（不影响登录） ───────────────────────────────────
-    # 注：Windsurf 的 IndexedDB 存的是 Cascade 面板 UI 状态（滚动/折叠/tab），
-    #     不是登录凭证。登录凭证位于 Cookies / Local Storage / installation_id。
-    safe_clean_dir "$WS_DIR/IndexedDB" "Windsurf IndexedDB（Cascade UI 状态，不影响登录和对话）"
-    safe_clean_dir "$WS_DIR/Service Worker/CacheStorage" "Windsurf Service Worker CacheStorage"
-    safe_clean_dir "$WS_DIR/Service Worker/ScriptCache" "Windsurf Service Worker ScriptCache"
-    safe_clean_dir "$WS_DIR/blob_storage" "Windsurf blob_storage"
-
-    # ── 日志 / 崩溃报告 ───────────────────────────────────────────────
-    safe_clean_dir "$WS_DIR/logs" "Windsurf 运行日志"
-    safe_clean_dir "$WS_DIR/Crashpad/completed" "Windsurf Crashpad completed"
-    safe_clean_dir "$WS_DIR/Crashpad/pending" "Windsurf Crashpad pending"
-
-    # ── 扩展与 Profile 残留 ───────────────────────────────────────────
-    safe_clean_dir "$WS_DIR/CachedExtensionVSIXs" "Windsurf 旧扩展安装包"
-    safe_clean_dir "$WS_DIR/CachedProfilesData" "Windsurf CachedProfilesData"
-
-    # ── state.vscdb.backup（旧备份，非对话历史） ──────────────────────
+    
+    # ── 计算 Windsurf 可清理项总大小 ────────────────────────────────
+    WS_CLEANABLE=0
+    # Electron 内核缓存
+    for cache_dir in "Cache" "CachedData" "GPUCache" "Code Cache" "DawnWebGPUCache" "DawnGraphiteCache" "Shared Dictionary"; do
+        [ -d "$WS_DIR/$cache_dir" ] && WS_CLEANABLE=$((WS_CLEANABLE + $(get_size_bytes "$WS_DIR/$cache_dir")))
+    done
+    # UI / 脚本缓存
+    for cache_dir in "IndexedDB" "Service Worker/CacheStorage" "Service Worker/ScriptCache" "blob_storage"; do
+        [ -d "$WS_DIR/$cache_dir" ] && WS_CLEANABLE=$((WS_CLEANABLE + $(get_size_bytes "$WS_DIR/$cache_dir")))
+    done
+    # 日志 / 崩溃报告
+    for cache_dir in "logs" "Crashpad/completed" "Crashpad/pending"; do
+        [ -d "$WS_DIR/$cache_dir" ] && WS_CLEANABLE=$((WS_CLEANABLE + $(get_size_bytes "$WS_DIR/$cache_dir")))
+    done
+    # 扩展与 Profile 残留
+    for cache_dir in "CachedExtensionVSIXs" "CachedProfilesData"; do
+        [ -d "$WS_DIR/$cache_dir" ] && WS_CLEANABLE=$((WS_CLEANABLE + $(get_size_bytes "$WS_DIR/$cache_dir")))
+    done
+    # state.vscdb.backup
     STATE_BACKUP="$WS_DIR/User/globalStorage/state.vscdb.backup"
-    if [ -f "$STATE_BACKUP" ]; then
-        size=$(get_size_bytes "$STATE_BACKUP")
-        if [ "$size" -gt 0 ]; then
-            echo -e "  ${CYAN}state.vscdb.backup${NC}: $(format_size $size)"
-            print_info "  这是旧的 SQLite 备份，不是对话历史（对话在 ~/.codeium/windsurf/cascade/）"
-            if confirm "  清理此项？"; then
-                rm -f "$STATE_BACKUP" 2>/dev/null
-                TOTAL_FREED=$((TOTAL_FREED + size))
-                print_success "  已清理 $(format_size $size)"
-            fi
-        fi
-    fi
-
-    # ── state.vscdb VACUUM 优化（卡顿治理核心，不删数据只压缩） ────────
+    [ -f "$STATE_BACKUP" ] && WS_CLEANABLE=$((WS_CLEANABLE + $(get_size_bytes "$STATE_BACKUP")))
+    # state.vscdb size before vacuum
     STATE_DB="$WS_DIR/User/globalStorage/state.vscdb"
-    if [ -f "$STATE_DB" ] && command -v sqlite3 &>/dev/null; then
-        before=$(get_size_bytes "$STATE_DB")
-        echo -e "  ${CYAN}state.vscdb (VACUUM 瘦身)${NC}: $(format_size $before)"
-        if confirm "  执行 VACUUM 压缩（保留全部数据只去碎片）？"; then
-            if sqlite3 "$STATE_DB" "VACUUM;" 2>/dev/null; then
-                after=$(get_size_bytes "$STATE_DB")
-                diff=$((before - after))
-                [ "$diff" -lt 0 ] && diff=0
-                TOTAL_FREED=$((TOTAL_FREED + diff))
-                print_success "  VACUUM 完成，释放 $(format_size $diff)"
-            else
-                print_warning "  VACUUM 失败（请先关闭 Windsurf 再重试）"
-            fi
-        fi
-    fi
-
-    # ── workspaceStorage 下所有工作区 state.vscdb 批量 VACUUM ─────────
+    [ -f "$STATE_DB" ] && WS_CLEANABLE=$((WS_CLEANABLE + $(get_size_bytes "$STATE_DB")))
+    # workspaceStorage size before vacuum
     WS_STORAGE_DIR="$WS_DIR/User/workspaceStorage"
-    if [ -d "$WS_STORAGE_DIR" ] && command -v sqlite3 &>/dev/null; then
-        WS_VACUUM_COUNT=0
-        WS_VACUUM_FREED=0
-        # 先计算总大小
-        WS_TOTAL_BEFORE=$(get_size_bytes "$WS_STORAGE_DIR")
-        if [ "$WS_TOTAL_BEFORE" -gt 0 ]; then
-            echo -e "  ${CYAN}workspaceStorage (所有工作区 VACUUM)${NC}: $(format_size $WS_TOTAL_BEFORE)"
-            if confirm "  批量 VACUUM 所有工作区 state.vscdb（保留工作区状态）？"; then
+    [ -d "$WS_STORAGE_DIR" ] && WS_CLEANABLE=$((WS_CLEANABLE + $(get_size_bytes "$WS_STORAGE_DIR")))
+    # /tmp snapshot count
+    SNAPSHOT_COUNT=$(ls /tmp/windsurf-terminal-*.snapshot 2>/dev/null | wc -l | tr -d ' ')
+    # AI 索引
+    for ai_dir in "$HOME/.codeium/windsurf/implicit" "$HOME/.codeium/windsurf/code_tracker"; do
+        [ -d "$ai_dir" ] && WS_CLEANABLE=$((WS_CLEANABLE + $(get_size_bytes "$ai_dir")))
+    done
+
+    if [ "$WS_CLEANABLE" -gt 0 ] 2>/dev/null; then
+        echo -e "  ${CYAN}Windsurf 可清理/可优化项目总计${NC}: $(format_size $WS_CLEANABLE)"
+        if confirm "  是否一键清理 Windsurf 缓存、日志、AI索引并压缩数据库（不影响登录和历史对话，解决长对话卡顿）？"; then
+            # 1. 清理 Electron 内核缓存
+            silent_remove_dir "$WS_DIR/Cache" "Windsurf Cache（浏览器缓存）"
+            silent_remove_dir "$WS_DIR/CachedData" "Windsurf CachedData（编译缓存）"
+            silent_remove_dir "$WS_DIR/GPUCache" "Windsurf GPUCache"
+            silent_remove_dir "$WS_DIR/Code Cache" "Windsurf Code Cache"
+            silent_remove_dir "$WS_DIR/DawnWebGPUCache" "Windsurf DawnWebGPUCache"
+            silent_remove_dir "$WS_DIR/DawnGraphiteCache" "Windsurf DawnGraphiteCache"
+            silent_remove_dir "$WS_DIR/Shared Dictionary" "Windsurf Shared Dictionary"
+
+            # 2. 清理 UI / 脚本缓存
+            silent_clean_dir "$WS_DIR/IndexedDB" "Windsurf IndexedDB"
+            silent_clean_dir "$WS_DIR/Service Worker/CacheStorage" "Windsurf Service Worker CacheStorage"
+            silent_clean_dir "$WS_DIR/Service Worker/ScriptCache" "Windsurf Service Worker ScriptCache"
+            silent_clean_dir "$WS_DIR/blob_storage" "Windsurf blob_storage"
+
+            # 3. 清理 日志 / 崩溃报告
+            silent_clean_dir "$WS_DIR/logs" "Windsurf 运行日志"
+            silent_clean_dir "$WS_DIR/Crashpad/completed" "Windsurf Crashpad completed"
+            silent_clean_dir "$WS_DIR/Crashpad/pending" "Windsurf Crashpad pending"
+
+            # 4. 清理 扩展与 Profile 残留
+            silent_clean_dir "$WS_DIR/CachedExtensionVSIXs" "Windsurf 旧扩展安装包"
+            silent_clean_dir "$WS_DIR/CachedProfilesData" "Windsurf CachedProfilesData"
+
+            # 5. 清理 state.vscdb.backup
+            if [ -f "$STATE_BACKUP" ]; then
+                rm -f "$STATE_BACKUP" 2>/dev/null
+                print_success "  已清理旧 state.vscdb.backup"
+            fi
+
+            # 6. state.vscdb VACUUM 优化
+            if [ -f "$STATE_DB" ] && command -v sqlite3 &>/dev/null; then
+                before=$(get_size_bytes "$STATE_DB")
+                if sqlite3 "$STATE_DB" "VACUUM;" 2>/dev/null; then
+                    after=$(get_size_bytes "$STATE_DB")
+                    diff=$((before - after))
+                    [ "$diff" -lt 0 ] && diff=0
+                    TOTAL_FREED=$((TOTAL_FREED + diff))
+                    print_success "  state.vscdb VACUUM 完成，释放 $(format_size $diff)"
+                fi
+            fi
+
+            # 7. workspaceStorage 批量 VACUUM
+            if [ -d "$WS_STORAGE_DIR" ] && command -v sqlite3 &>/dev/null; then
+                WS_VACUUM_COUNT=0
+                WS_VACUUM_FREED=0
                 while IFS= read -r ws_db; do
                     [ -z "$ws_db" ] && continue
                     wb=$(get_size_bytes "$ws_db")
@@ -625,64 +614,43 @@ if [ -d "$WS_DIR" ]; then
                     fi
                 done < <(find "$WS_STORAGE_DIR" -maxdepth 2 -name "state.vscdb" -type f 2>/dev/null)
                 TOTAL_FREED=$((TOTAL_FREED + WS_VACUUM_FREED))
-                print_success "  已 VACUUM $WS_VACUUM_COUNT 个工作区数据库，释放 $(format_size $WS_VACUUM_FREED)"
+                print_success "  已批量 VACUUM $WS_VACUUM_COUNT 个工作区数据库，释放 $(format_size $WS_VACUUM_FREED)"
             fi
-        fi
-    fi
 
-    # ── /tmp 终端快照与 Zsh 自动补全缓存（解决终端卡顿） ──────────────
-    SNAPSHOT_COUNT=$(ls /tmp/windsurf-terminal-*.snapshot 2>/dev/null | wc -l | tr -d ' ')
-    if [ "$SNAPSHOT_COUNT" -gt 0 ] 2>/dev/null; then
-        echo -e "  ${CYAN}/tmp/windsurf-terminal-*.snapshot${NC}: 共 $SNAPSHOT_COUNT 个"
-        if confirm "  清理这些终端快照？"; then
-            rm -f /tmp/windsurf-terminal-*.snapshot 2>/dev/null
-            print_success "  已清理 $SNAPSHOT_COUNT 个终端快照"
-        fi
-    fi
+            # 8. /tmp 终端快照清理
+            if [ "$SNAPSHOT_COUNT" -gt 0 ] 2>/dev/null; then
+                rm -f /tmp/windsurf-terminal-*.snapshot 2>/dev/null
+                print_success "  已清理 $SNAPSHOT_COUNT 个终端快照"
+            fi
 
-    # ── ~/.codeium/windsurf/implicit 和 code_tracker AI 索引缓存 ─────
-    for ai_dir in "$HOME/.codeium/windsurf/implicit" "$HOME/.codeium/windsurf/code_tracker"; do
-        if [ -d "$ai_dir" ]; then
-            size=$(get_size_bytes "$ai_dir")
-            if [ "$size" -gt 0 ]; then
-                dir_name=$(basename "$ai_dir")
-                echo -e "  ${CYAN}codeium/windsurf/$dir_name${NC}: $(format_size $size)"
-                print_info "  AI 索引缓存，删除后会自动重建，不影响对话或登录"
-                if confirm "  清理 $dir_name？"; then
+            # 9. AI 索引缓存清理
+            for ai_dir in "$HOME/.codeium/windsurf/implicit" "$HOME/.codeium/windsurf/code_tracker"; do
+                if [ -d "$ai_dir" ]; then
+                    size=$(get_size_bytes "$ai_dir")
                     rm -rf "$ai_dir"/* 2>/dev/null
                     rm -rf "$ai_dir"/.[!.]* 2>/dev/null
                     TOTAL_FREED=$((TOTAL_FREED + size))
-                    print_success "  已清理 $(format_size $size)"
+                    print_success "  已清理 $(basename $ai_dir) AI 索引"
                 fi
-            fi
+            done
+            print_success "  Windsurf 缓存清理与卡顿优化完成"
+        else
+            print_info "  已跳过 Windsurf 缓存清理"
         fi
-    done
+    fi
 
-    # ── WebStorage / Local Storage / Cookies 默认保留（登录态） ──────
-    # 以下目录只做提示，不做清理，除非用户明确接受重登风险
+    # ── WebStorage / Local Storage / Cookies 默认保留提示 ────────────────
     WS_WEB_STORAGE="$WS_DIR/WebStorage"
-    if [ -d "$WS_WEB_STORAGE" ]; then
-        size=$(get_size_bytes "$WS_WEB_STORAGE")
-        if [ "$size" -gt 0 ]; then
-            echo -e "  ${YELLOW}[已保留] WebStorage${NC}: $(format_size $size)（登录态，清理会强制重登）"
-        fi
-    fi
+    [ -d "$WS_WEB_STORAGE" ] && echo -e "  ${YELLOW}[已保留] WebStorage${NC}: $(format_size $(get_size_bytes "$WS_WEB_STORAGE"))（登录态）"
     WS_LOCAL_STORAGE="$WS_DIR/Local Storage"
-    if [ -d "$WS_LOCAL_STORAGE" ]; then
-        size=$(get_size_bytes "$WS_LOCAL_STORAGE")
-        if [ "$size" -gt 0 ]; then
-            echo -e "  ${YELLOW}[已保留] Local Storage${NC}: $(format_size $size)（会话数据，清理可能重登）"
-        fi
-    fi
+    [ -d "$WS_LOCAL_STORAGE" ] && echo -e "  ${YELLOW}[已保留] Local Storage${NC}: $(format_size $(get_size_bytes "$WS_LOCAL_STORAGE"))（会话数据）"
 
-    # ── Windsurf 设备 ID 强制重置（与 fix-windsurf-mac.sh 对齐） ──────
-    # 默认行为：清完 Windsurf 缓存后重置设备 ID。
-    # 关闭方式：FORCE_RESET_ID=0 bash macos-safe-cleanup.sh
+    # ── Windsurf 设备 ID 强制重置（仍独立保留确认，因为有重登风险） ──────
     if [ "${FORCE_RESET_ID:-1}" != "0" ] && [ "${FORCE_RESET_ID:-1}" != "false" ]; then
         echo ""
-        print_warning "[强制重置模式] 即将重置 Windsurf 设备 ID（可能需要重登）"
-        print_info     "  关闭方式：下次运行前加 FORCE_RESET_ID=0 bash macos-safe-cleanup.sh"
-        if confirm "  确认重置（y=重置，N=跳过）？"; then
+        print_warning "[强制重置模式] 重置 Windsurf 设备 ID（可能需要重新登录）"
+        print_info     "  可通过设置环境变量 FORCE_RESET_ID=0 跳过重置"
+        if confirm "  是否重置 Windsurf 设备 ID？"; then
             INSTALL_ID_FILE="$HOME/.codeium/windsurf/installation_id"
             MACHINE_ID_FILE="$WS_DIR/machineid"
             STORAGE_JSON="$WS_DIR/User/globalStorage/storage.json"
@@ -714,8 +682,6 @@ except Exception as e:
 PYEOF
             fi
 
-            # 【补强】同步重置 state.vscdb 的 ItemTable 中的 telemetry 键
-            # 原因：VSCode/Windsurf 会把 telemetry 镜像到 SQLite，只改 storage.json 重启会被覆盖
             STATE_DB="$WS_DIR/User/globalStorage/state.vscdb"
             if [ -f "$STATE_DB" ] && command -v sqlite3 &>/dev/null; then
                 sqlite3 "$STATE_DB" <<SQLEOF 2>/dev/null
@@ -734,23 +700,52 @@ SQLEOF
 fi
 echo ""
 
-# 18. Choice 临时与日志缓存
+# 18. Choice 临时与日志缓存（合并一键清理）
 print_info "18. Choice 临时与日志缓存"
 CHOICE_DIR="$HOME/Library/Application Support/Choice"
 if [ -d "$CHOICE_DIR" ]; then
-    safe_remove_dir "$CHOICE_DIR/temp" "Choice 临时目录"
-    safe_remove_dir "$CHOICE_DIR/logs" "Choice 日志目录"
-    safe_remove_dir "$CHOICE_DIR/crash/Reports" "Choice 崩溃报告"
-    safe_remove_dir "$CHOICE_DIR/crash/Data" "Choice 崩溃数据"
+    CHOICE_CLEANABLE=0
+    for cache_dir in "temp" "logs" "crash/Reports" "crash/Data"; do
+        [ -d "$CHOICE_DIR/$cache_dir" ] && CHOICE_CLEANABLE=$((CHOICE_CLEANABLE + $(get_size_bytes "$CHOICE_DIR/$cache_dir")))
+    done
+
+    if [ "$CHOICE_CLEANABLE" -gt 0 ]; then
+        echo -e "  ${CYAN}Choice 可清理缓存${NC}: $(format_size $CHOICE_CLEANABLE)"
+        if confirm "  是否清理 Choice 临时文件、日志和崩溃报告？"; then
+            silent_remove_dir "$CHOICE_DIR/temp" "Choice 临时目录"
+            silent_remove_dir "$CHOICE_DIR/logs" "Choice 日志目录"
+            silent_remove_dir "$CHOICE_DIR/crash/Reports" "Choice 崩溃报告"
+            silent_remove_dir "$CHOICE_DIR/crash/Data" "Choice 崩溃数据"
+            print_success "  Choice 缓存清理完成"
+        else
+            print_info "  已跳过 Choice 缓存清理"
+        fi
+    else
+        print_info "  未检测到 Choice 可清理缓存"
+    fi
 fi
 echo ""
 
-# 19. MathWorks 日志与本地作业缓存
+# 19. MathWorks 日志与本地作业缓存（合并一键清理）
 print_info "19. MathWorks 日志与本地作业缓存"
 MATHWORKS_DIR="$HOME/Library/Application Support/MathWorks"
 if [ -d "$MATHWORKS_DIR" ]; then
-    safe_remove_dir "$MATHWORKS_DIR/ServiceHost/logs" "MathWorks ServiceHost 日志"
-    safe_remove_dir "$MATHWORKS_DIR/MATLAB/local_cluster_jobs" "MathWorks 本地作业缓存"
+    MW_CLEANABLE=0
+    [ -d "$MATHWORKS_DIR/ServiceHost/logs" ] && MW_CLEANABLE=$((MW_CLEANABLE + $(get_size_bytes "$MATHWORKS_DIR/ServiceHost/logs")))
+    [ -d "$MATHWORKS_DIR/MATLAB/local_cluster_jobs" ] && MW_CLEANABLE=$((MW_CLEANABLE + $(get_size_bytes "$MATHWORKS_DIR/MATLAB/local_cluster_jobs")))
+
+    if [ "$MW_CLEANABLE" -gt 0 ]; then
+        echo -e "  ${CYAN}MathWorks 可清理缓存${NC}: $(format_size $MW_CLEANABLE)"
+        if confirm "  是否清理 MathWorks ServiceHost 日志与 MATLAB 本地作业缓存？"; then
+            silent_remove_dir "$MATHWORKS_DIR/ServiceHost/logs" "MathWorks ServiceHost 日志"
+            silent_remove_dir "$MATHWORKS_DIR/MATLAB/local_cluster_jobs" "MathWorks 本地作业缓存"
+            print_success "  MathWorks 缓存清理完成"
+        else
+            print_info "  已跳过 MathWorks 缓存清理"
+        fi
+    else
+        print_info "  未检测到 MathWorks 可清理缓存"
+    fi
 fi
 echo ""
 
@@ -761,7 +756,7 @@ echo -e "\n${BLUE}${SECTION_BAR}${NC}"
 echo -e "${BLUE}  第三部分: 开发工具清理${NC}"
 echo -e "${BLUE}${SECTION_BAR}${NC}\n"
 
-# 20. Safari 浏览器缓存
+# 20. Safari 浏览器缓存（合并一键清理）
 print_info "20. Safari 浏览器缓存"
 SAFARI_CACHE="$HOME/Library/Caches/com.apple.Safari"
 SAFARI_WEBKIT="$HOME/Library/Caches/com.apple.WebKit.WebContent"
@@ -769,58 +764,51 @@ SAFARI_FS="$HOME/Library/Safari/LocalStorage"
 SAFARI_ICONS="$HOME/Library/Safari/Icons"
 SAFARI_PERF="$HOME/Library/Caches/com.apple.Safari/PerSitePreferences"
 
+SAFARI_CLEANABLE=0
 for cache_dir in "$SAFARI_CACHE" "$SAFARI_WEBKIT" "$SAFARI_FS" "$SAFARI_ICONS" "$SAFARI_PERF"; do
-    if [ -d "$cache_dir" ]; then
-        cache_size=$(get_size_bytes "$cache_dir")
-        if [ "$cache_size" -gt 0 ]; then
-            dir_name=$(basename "$cache_dir")
-            echo -e "  ${CYAN}$dir_name${NC}: $(format_size $cache_size)"
-            if confirm "  清理 $dir_name？"; then
-                rm -rf "$cache_dir"/* 2>/dev/null
-                rm -rf "$cache_dir"/.[!.]* 2>/dev/null
-                TOTAL_FREED=$((TOTAL_FREED + cache_size))
-                print_success "  $dir_name 已清理"
-            fi
-        fi
-    fi
+    [ -d "$cache_dir" ] && SAFARI_CLEANABLE=$((SAFARI_CLEANABLE + $(get_size_bytes "$cache_dir")))
 done
+
+if [ "$SAFARI_CLEANABLE" -gt 0 ]; then
+    echo -e "  ${CYAN}Safari 可清理缓存${NC}: $(format_size $SAFARI_CLEANABLE)"
+    if confirm "  是否清理 Safari 浏览器缓存与临时数据（包含网页缓存、图标及 PerSitePreferences 等 5 项）？"; then
+        silent_clean_dir "$SAFARI_CACHE" "Safari 浏览器缓存"
+        silent_clean_dir "$SAFARI_WEBKIT" "Safari WebKit 缓存"
+        silent_clean_dir "$SAFARI_FS" "Safari 本地存储"
+        silent_clean_dir "$SAFARI_ICONS" "Safari 网站图标缓存"
+        silent_clean_dir "$SAFARI_PERF" "Safari 站点特定配置缓存"
+        print_success "  Safari 缓存清理完成"
+    else
+        print_info "  已跳过 Safari 缓存清理"
+    fi
+else
+    print_info "  未检测到 Safari 可清理缓存"
+fi
 echo ""
 
-# 21. Xcode 缓存和派生数据
+# 21. Xcode 缓存和派生数据（合并一键清理）
 print_info "21. Xcode 派生数据和缓存"
 XCODE_DERIVED="$HOME/Library/Developer/Xcode/DerivedData"
 XCODE_ARCHIVES="$HOME/Library/Developer/Xcode/Archives"
-XCODE_DOCC="$HOME/Library/Developer/Shared/Documentation/DocSets"
 XCODE_SIMULATOR="$HOME/Library/Developer/CoreSimulator"
-XCODE_SIM_RUNTIME="$HOME/Library/Developer/CoreSimulator/Profiles/Runtimes"
 
-for cache_dir in "$XCODE_DERIVED" "$XCODE_ARCHIVES"; do
-    if [ -d "$cache_dir" ]; then
-        cache_size=$(get_size_bytes "$cache_dir")
-        if [ "$cache_size" -gt 0 ]; then
-            dir_name=$(basename "$cache_dir")
-            echo -e "  ${CYAN}$dir_name${NC}: $(format_size $cache_size)"
-            if confirm "  清理 $dir_name？"; then
-                rm -rf "$cache_dir"/* 2>/dev/null
-                rm -rf "$cache_dir"/.[!.]* 2>/dev/null
-                TOTAL_FREED=$((TOTAL_FREED + cache_size))
-                print_success "  $dir_name 已清理"
-            fi
-        fi
-    fi
-done
+XCODE_CLEANABLE=0
+[ -d "$XCODE_DERIVED" ] && XCODE_CLEANABLE=$((XCODE_CLEANABLE + $(get_size_bytes "$XCODE_DERIVED")))
+[ -d "$XCODE_ARCHIVES" ] && XCODE_CLEANABLE=$((XCODE_CLEANABLE + $(get_size_bytes "$XCODE_ARCHIVES")))
+[ -d "$XCODE_SIMULATOR" ] && XCODE_CLEANABLE=$((XCODE_CLEANABLE + $(get_size_bytes "$XCODE_SIMULATOR")))
 
-if [ -d "$XCODE_SIMULATOR" ]; then
-    sim_size=$(get_size_bytes "$XCODE_SIMULATOR")
-    if [ "$sim_size" -gt 0 ]; then
-        echo -e "  ${CYAN}CoreSimulator${NC}: $(format_size $sim_size)"
-        if confirm "  清理模拟器数据？"; then
-            rm -rf "$XCODE_SIMULATOR"/* 2>/dev/null
-            rm -rf "$XCODE_SIMULATOR"/.[!.]* 2>/dev/null
-            TOTAL_FREED=$((TOTAL_FREED + sim_size))
-            print_success "  CoreSimulator 已清理"
-        fi
+if [ "$XCODE_CLEANABLE" -gt 0 ]; then
+    echo -e "  ${CYAN}Xcode 可清理缓存/派生数据${NC}: $(format_size $XCODE_CLEANABLE)"
+    if confirm "  是否清理 Xcode 派生数据、历史归档及模拟器缓存数据？"; then
+        silent_clean_dir "$XCODE_DERIVED" "Xcode DerivedData (派生数据)"
+        silent_clean_dir "$XCODE_ARCHIVES" "Xcode Archives (历史归档)"
+        silent_clean_dir "$XCODE_SIMULATOR" "CoreSimulator (模拟器临时数据)"
+        print_success "  Xcode 缓存清理完成"
+    else
+        print_info "  已跳过 Xcode 缓存清理"
     fi
+else
+    print_info "  未检测到 Xcode 可清理缓存"
 fi
 echo ""
 
@@ -930,64 +918,55 @@ echo -e "\n${RED}${SECTION_BAR}${NC}"
 echo -e "${RED}  第四部分: 系统级清理（需要管理员密码）${NC}"
 echo -e "${RED}${SECTION_BAR}${NC}\n"
 
-# 27. 系统诊断日志（2.7GB）
-print_info "27. 系统诊断日志 (/private/var/db/diagnostics)"
-if [ -d "/private/var/db/diagnostics" ]; then
-    size=$(du -sk /private/var/db/diagnostics 2>/dev/null | awk '{print $1 * 1024}')
-    echo -e "  ${CYAN}系统诊断日志${NC}: $(format_size $size)"
-    print_warning "  这些是 Apple 统一日志，删除后不影响系统运行"
-    # 在清理前先计算 uuidtext 大小
-    uuidtext_size=$(du -sk /private/var/db/uuidtext 2>/dev/null | awk '{print $1 * 1024}')
-    if confirm "  清理此项（需要 sudo）？"; then
-        sudo rm -rf /private/var/db/diagnostics/* 2>/dev/null
-        sudo rm -rf /private/var/db/uuidtext/* 2>/dev/null
-        TOTAL_FREED=$((TOTAL_FREED + size))
-        TOTAL_FREED=$((TOTAL_FREED + uuidtext_size))
-        print_success "  已清理系统诊断日志和 UUID 文本"
-    else
-        print_info "  已跳过"
-    fi
-fi
-echo ""
+# 27. 系统诊断日志、系统日志与临时文件一键清理（合并一键清理，需要 sudo 密码）
+print_info "27. 系统级日志与临时文件清理"
+SYS_DIAG_DIR="/private/var/db/diagnostics"
+SYS_LOG_DIR="/private/var/log"
+SYS_FOLDER_DIR="/private/var/folders"
 
-# 28. 系统日志
-print_info "28. 系统日志 (/private/var/log)"
-if [ -d "/private/var/log" ]; then
-    size=$(du -sk /private/var/log 2>/dev/null | awk '{print $1 * 1024}')
-    echo -e "  ${CYAN}系统日志${NC}: $(format_size $size)"
-    print_warning "  只清理超过30天的旧日志文件"
-    if confirm "  清理旧日志（需要 sudo）？"; then
-        sudo find /private/var/log -name "*.log" -mtime +30 -delete 2>/dev/null
-        sudo find /private/var/log -name "*.gz" -mtime +30 -delete 2>/dev/null
-        sudo find /private/var/log -name "*.bz2" -mtime +30 -delete 2>/dev/null
-        print_success "  已清理30天以上的旧日志"
-    else
-        print_info "  已跳过"
-    fi
-fi
-echo ""
+SYS_CLEANABLE=0
+[ -d "$SYS_DIAG_DIR" ] && SYS_CLEANABLE=$((SYS_CLEANABLE + $(du -sk "$SYS_DIAG_DIR" 2>/dev/null | awk '{print $1 * 1024}')))
+[ -d "/private/var/db/uuidtext" ] && SYS_CLEANABLE=$((SYS_CLEANABLE + $(du -sk "/private/var/db/uuidtext" 2>/dev/null | awk '{print $1 * 1024}')))
+[ -d "$SYS_LOG_DIR" ] && SYS_CLEANABLE=$((SYS_CLEANABLE + $(du -sk "$SYS_LOG_DIR" 2>/dev/null | awk '{print $1 * 1024}')))
+[ -d "$SYS_FOLDER_DIR" ] && SYS_CLEANABLE=$((SYS_CLEANABLE + $(du -sk "$SYS_FOLDER_DIR" 2>/dev/null | awk '{print $1 * 1024}')))
 
-# 29. 临时文件夹（已排除 ask-continue-ports）
-print_info "29. 系统临时文件 (/private/var/folders)"
-if [ -d "/private/var/folders" ]; then
-    size=$(du -sk /private/var/folders 2>/dev/null | awk '{print $1 * 1024}')
-    echo -e "  ${CYAN}系统临时文件${NC}: $(format_size $size)"
-    print_warning "  只清理超过7天的临时文件"
-    print_warning "  [安全] 已排除 ask-continue-ports 相关文件"
-    if confirm "  清理旧临时文件（需要 sudo）？"; then
-        # 先查找所有 C 目录，然后清理时排除包含 ask-continue-ports 的路径
-        sudo find /private/var/folders -name "C" -type d -mindepth 3 -maxdepth 3 2>/dev/null | while read d; do
-            # 只删除超过7天的文件，但跳过 ask-continue-ports
-            sudo find "$d" -mtime +7 ! -path "*ask-continue-ports*" -delete 2>/dev/null
-        done
-        # 额外确保 /private/tmp/ask-continue-ports 不被误删（显式保护）
-        if [ -e "/private/tmp/ask-continue-ports" ]; then
-            print_info "  已保护 /private/tmp/ask-continue-ports"
+if [ "$SYS_CLEANABLE" -gt 0 ]; then
+    echo -e "  ${CYAN}系统级可清理垃圾${NC}: $(format_size $SYS_CLEANABLE)"
+    print_warning "  此操作需要管理员权限，用户在确认后只需输入一次密码"
+    if confirm "  是否一键清理系统诊断日志、30天以上的旧日志及7天以上的系统临时文件（保留 ports 端口保护）？"; then
+        if [ -d "$SYS_DIAG_DIR" ]; then
+            echo -e "  ${CYAN}正在清理系统诊断日志...${NC}"
+            sudo rm -rf /private/var/db/diagnostics/* 2>/dev/null
+            sudo rm -rf /private/var/db/uuidtext/* 2>/dev/null
+            print_success "  系统诊断日志清理完成"
         fi
-        print_success "  已清理7天以上的临时文件（ask-continue-ports 已保留）"
+
+        if [ -d "$SYS_LOG_DIR" ]; then
+            echo -e "  ${CYAN}正在清理30天以上的旧日志...${NC}"
+            sudo find /private/var/log -name "*.log" -mtime +30 -delete 2>/dev/null
+            sudo find /private/var/log -name "*.gz" -mtime +30 -delete 2>/dev/null
+            sudo find /private/var/log -name "*.bz2" -mtime +30 -delete 2>/dev/null
+            print_success "  系统日志清理完成"
+        fi
+
+        if [ -d "$SYS_FOLDER_DIR" ]; then
+            echo -e "  ${CYAN}正在清理7天以上的系统临时文件（ask-continue-ports 已保护）...${NC}"
+            sudo find /private/var/folders -name "C" -type d -mindepth 3 -maxdepth 3 2>/dev/null | while read d; do
+                sudo find "$d" -mtime +7 ! -path "*ask-continue-ports*" -delete 2>/dev/null
+            done
+            if [ -e "/private/tmp/ask-continue-ports" ]; then
+                print_info "  已保护 /private/tmp/ask-continue-ports"
+            fi
+            print_success "  系统临时文件清理完成"
+        fi
+        
+        TOTAL_FREED=$((TOTAL_FREED + SYS_CLEANABLE))
+        print_success "  系统级大类清理全部完成"
     else
-        print_info "  已跳过"
+        print_info "  已跳过系统级清理"
     fi
+else
+    print_info "  未检测到系统级可清理数据"
 fi
 echo ""
 
@@ -1041,13 +1020,13 @@ fi
 echo ""
 
 # ============================================================================
-# 第五部分: AI 工具深度清理 (Claude Code / Codex / Gemini CLI / OpenCode)
+# 第五部分: AI 工具深度清理 (Claude Code / Gemini CLI / OpenCode)
 # ============================================================================
 echo -e "\n${CYAN}${SECTION_BAR}${NC}"
-echo -e "${CYAN}  第五部分: AI 工具深度清理 (Claude/Codex/Gemini/OpenCode)${NC}"
+echo -e "${CYAN}  第五部分: AI 工具深度清理 (Claude/Gemini/OpenCode)${NC}"
 echo -e "${CYAN}${SECTION_BAR}${NC}\n"
 
-# 31. Claude Code 缓存清理
+# 31. Claude Code 缓存清理（合并一键清理）
 print_info "31. Claude Code 缓存"
 CLAUDE_DIR="$HOME/.claude"
 if [ -d "$CLAUDE_DIR" ]; then
@@ -1067,158 +1046,109 @@ if [ -d "$CLAUDE_DIR" ]; then
     CLAUDE_TELEMETRY="$CLAUDE_DIR/telemetry"
     CLAUDE_BACKUPS="$CLAUDE_DIR/backups"
 
+    CLAUDE_CLEANABLE=0
     for cache_dir in "$CLAUDE_CACHE" "$CLAUDE_DEBUG" "$CLAUDE_DOWNLOADS" "$CLAUDE_PASTE" "$CLAUDE_PLUGINS_CACHE" "$CLAUDE_SESSION_DATA" "$CLAUDE_FILE_HISTORY" "$CLAUDE_SHELL_SNAPSHOTS" "$CLAUDE_TASKS" "$CLAUDE_TODOS" "$CLAUDE_SESSION_ENV" "$CLAUDE_IDE" "$CLAUDE_METRICS" "$CLAUDE_TELEMETRY" "$CLAUDE_BACKUPS"; do
-        if [ -d "$cache_dir" ]; then
-            cache_size=$(get_size_bytes "$cache_dir")
-            if [ "$cache_size" -gt 0 ]; then
-                dir_name=$(basename "$cache_dir")
-                echo -e "    ${CYAN}$dir_name${NC}: $(format_size $cache_size)"
-                if confirm "    清理 $dir_name？"; then
-                    rm -rf "$cache_dir"/* 2>/dev/null
-                    rm -rf "$cache_dir"/.[!.]* 2>/dev/null
-                    TOTAL_FREED=$((TOTAL_FREED + cache_size))
-                    print_success "    $dir_name 已清理"
-                fi
-            fi
-        fi
+        [ -d "$cache_dir" ] && CLAUDE_CLEANABLE=$((CLAUDE_CLEANABLE + $(get_size_bytes "$cache_dir")))
     done
+
+    if [ "$CLAUDE_CLEANABLE" -gt 0 ]; then
+        echo -e "  ${CYAN}Claude Code 可清理缓存${NC}: $(format_size $CLAUDE_CLEANABLE)"
+        if confirm "  是否清理 Claude Code 缓存与临时文件（包含会话历史、任务快照、调试日志等 15 项）？"; then
+            silent_clean_dir "$CLAUDE_CACHE" "Claude 缓存"
+            silent_clean_dir "$CLAUDE_DEBUG" "Claude 调试日志"
+            silent_clean_dir "$CLAUDE_DOWNLOADS" "Claude 下载缓存"
+            silent_clean_dir "$CLAUDE_PASTE" "Claude 粘贴剪切板缓存"
+            silent_clean_dir "$CLAUDE_PLUGINS_CACHE" "Claude 插件缓存"
+            silent_clean_dir "$CLAUDE_SESSION_DATA" "Claude 会话数据"
+            silent_clean_dir "$CLAUDE_FILE_HISTORY" "Claude 文件历史"
+            silent_clean_dir "$CLAUDE_SHELL_SNAPSHOTS" "Claude 终端快照"
+            silent_clean_dir "$CLAUDE_TASKS" "Claude 任务记录"
+            silent_clean_dir "$CLAUDE_TODOS" "Claude 待办事项"
+            silent_clean_dir "$CLAUDE_SESSION_ENV" "Claude 会话环境变量"
+            silent_clean_dir "$CLAUDE_IDE" "Claude IDE 集成数据"
+            silent_clean_dir "$CLAUDE_METRICS" "Claude 度量监控数据"
+            silent_clean_dir "$CLAUDE_TELEMETRY" "Claude 遥测数据"
+            silent_clean_dir "$CLAUDE_BACKUPS" "Claude 自动备份"
+            print_success "  Claude Code 缓存清理完成"
+        else
+            print_info "  已跳过 Claude Code 缓存清理"
+        fi
+    else
+        print_info "  未检测到 Claude Code 可清理缓存"
+    fi
 else
     print_info "  未检测到 Claude Code"
 fi
 echo ""
 
-# 32. OpenAI Codex 缓存清理
-print_info "32. OpenAI Codex 缓存"
-CODEX_DIR="$HOME/.codex"
-if [ -d "$CODEX_DIR" ]; then
-    CODEX_ITEMS=(
-        ".tmp::$CODEX_DIR/.tmp"
-        "tmp::$CODEX_DIR/tmp"
-        "cache::$CODEX_DIR/cache"
-        "log::$CODEX_DIR/log"
-        "plugins-cache::$CODEX_DIR/plugins/cache"
-    )
-    CODEX_SHM="$CODEX_DIR/logs_1.sqlite-shm"
-    CODEX_WAL="$CODEX_DIR/logs_1.sqlite-wal"
-    CODEX_MODELS="$CODEX_DIR/models_cache.json"
-    CODEX_SKILLS="$CODEX_DIR/vendor_imports/skills-curated-cache.json"
-
-    for item in "${CODEX_ITEMS[@]}"; do
-        label="${item%%::*}"
-        cache_dir="${item#*::}"
-        if [ -d "$cache_dir" ]; then
-            cache_size=$(get_size_bytes "$cache_dir")
-            if [ "$cache_size" -gt 0 ]; then
-                echo -e "    ${CYAN}$label${NC}: $(format_size $cache_size)"
-                if confirm "    清理 $label"; then
-                    rm -rf "$cache_dir"/* 2>/dev/null
-                    rm -rf "$cache_dir"/.[!.]* 2>/dev/null
-                    TOTAL_FREED=$((TOTAL_FREED + cache_size))
-                    print_success "    $label 已清理"
-                fi
-            fi
-        fi
-    done
-
-    for cache_file in "$CODEX_SHM" "$CODEX_WAL" "$CODEX_MODELS" "$CODEX_SKILLS"; do
-        if [ -f "$cache_file" ]; then
-            file_size=$(get_size_bytes "$cache_file")
-            if [ "$file_size" -gt 0 ]; then
-                file_name=$(basename "$cache_file")
-                echo -e "    ${CYAN}$file_name${NC}: $(format_size $file_size)"
-                if confirm "    清理 $file_name？"; then
-                    rm -f "$cache_file" 2>/dev/null
-                    TOTAL_FREED=$((TOTAL_FREED + file_size))
-                    print_success "    $file_name 已清理"
-                fi
-            fi
-        fi
-    done
-else
-    print_info "  未检测到 OpenAI Codex"
-fi
-echo ""
-
-# 33. Gemini CLI 缓存清理
-print_info "33. Gemini CLI 缓存"
+# 32. Gemini CLI 缓存清理（合并一键清理）
+print_info "32. Gemini CLI 缓存"
 GEMINI_DIR="$HOME/.gemini"
 if [ -d "$GEMINI_DIR" ]; then
     GEMINI_CACHE="$GEMINI_DIR/cache"
     GEMINI_TMP="$GEMINI_DIR/tmp"
     GEMINI_TELEMETRY="$GEMINI_DIR/telemetry.log"
 
-    for cache_dir in "$GEMINI_CACHE" "$GEMINI_TMP"; do
-        if [ -d "$cache_dir" ]; then
-            cache_size=$(get_size_bytes "$cache_dir")
-            if [ "$cache_size" -gt 0 ]; then
-                dir_name=$(basename "$cache_dir")
-                echo -e "    ${CYAN}$dir_name${NC}: $(format_size $cache_size)"
-                if confirm "    清理 $dir_name？"; then
-                    rm -rf "$cache_dir"/* 2>/dev/null
-                    rm -rf "$cache_dir"/.[!.]* 2>/dev/null
-                    TOTAL_FREED=$((TOTAL_FREED + cache_size))
-                    print_success "    $dir_name 已清理"
-                fi
-            fi
-        fi
-    done
+    GEMINI_CLEANABLE=0
+    [ -d "$GEMINI_CACHE" ] && GEMINI_CLEANABLE=$((GEMINI_CLEANABLE + $(get_size_bytes "$GEMINI_CACHE")))
+    [ -d "$GEMINI_TMP" ] && GEMINI_CLEANABLE=$((GEMINI_CLEANABLE + $(get_size_bytes "$GEMINI_TMP")))
+    [ -f "$GEMINI_TELEMETRY" ] && GEMINI_CLEANABLE=$((GEMINI_CLEANABLE + $(get_size_bytes "$GEMINI_TELEMETRY")))
 
-    if [ -f "$GEMINI_TELEMETRY" ]; then
-        tel_size=$(get_size_bytes "$GEMINI_TELEMETRY")
-        if [ "$tel_size" -gt 0 ]; then
-            echo -e "    ${CYAN}telemetry.log${NC}: $(format_size $tel_size)"
-            if confirm "    清理 telemetry.log？"; then
+    if [ "$GEMINI_CLEANABLE" -gt 0 ]; then
+        echo -e "  ${CYAN}Gemini CLI 可清理数据${NC}: $(format_size $GEMINI_CLEANABLE)"
+        if confirm "  是否清理 Gemini CLI 缓存、临时文件与遥测日志？"; then
+            silent_clean_dir "$GEMINI_CACHE" "Gemini 缓存目录"
+            silent_clean_dir "$GEMINI_TMP" "Gemini 临时文件夹"
+            if [ -f "$GEMINI_TELEMETRY" ]; then
                 rm -f "$GEMINI_TELEMETRY" 2>/dev/null
-                TOTAL_FREED=$((TOTAL_FREED + tel_size))
-                print_success "    telemetry.log 已清理"
+                print_success "  已清理 telemetry.log"
             fi
+            print_success "  Gemini CLI 缓存清理完成"
+        else
+            print_info "  已跳过 Gemini CLI 缓存清理"
         fi
+    else
+        print_info "  未检测到 Gemini CLI 可清理缓存"
     fi
 else
     print_info "  未检测到 Gemini CLI"
 fi
 echo ""
 
-# 34. OpenCode 缓存清理
-print_info "34. OpenCode 缓存"
+# 33. OpenCode 缓存清理（合并一键清理）
+print_info "33. OpenCode 缓存"
 OPENCODE_CACHE="$HOME/Library/Caches/opencode"
 OPENCODE_DATA="$HOME/.local/share/opencode"
 OPENCODE_CONFIG="$HOME/.config/opencode"
 OPENCODE_LOG="$HOME/Library/Logs/opencode"
 
 if [ -d "$OPENCODE_CACHE" ] || [ -d "$OPENCODE_DATA" ] || [ -d "$OPENCODE_CONFIG" ] || [ -d "$OPENCODE_LOG" ]; then
+    OPENCODE_CLEANABLE=0
     for cache_dir in "$OPENCODE_CACHE" "$OPENCODE_DATA/tool-output" "$OPENCODE_DATA/log" "$OPENCODE_DATA/snapshot" "$OPENCODE_LOG"; do
-        if [ -d "$cache_dir" ]; then
-            cache_size=$(get_size_bytes "$cache_dir")
-            if [ "$cache_size" -gt 0 ]; then
-                dir_name=$(basename "$cache_dir")
-                echo -e "    ${CYAN}$dir_name${NC}: $(format_size $cache_size)"
-                if confirm "    清理 $dir_name？"; then
-                    rm -rf "$cache_dir"/* 2>/dev/null
-                    rm -rf "$cache_dir"/.[!.]* 2>/dev/null
-                    TOTAL_FREED=$((TOTAL_FREED + cache_size))
-                    print_success "    $dir_name 已清理"
-                fi
-            fi
-        fi
+        [ -d "$cache_dir" ] && OPENCODE_CLEANABLE=$((OPENCODE_CLEANABLE + $(get_size_bytes "$cache_dir")))
     done
-
     OPENCODE_DB_SHM="$OPENCODE_DATA/opencode.db-shm"
     OPENCODE_DB_WAL="$OPENCODE_DATA/opencode.db-wal"
-    for db_file in "$OPENCODE_DB_SHM" "$OPENCODE_DB_WAL"; do
-        if [ -f "$db_file" ]; then
-            db_size=$(get_size_bytes "$db_file")
-            if [ "$db_size" -gt 0 ]; then
-                file_name=$(basename "$db_file")
-                echo -e "    ${CYAN}$file_name${NC}: $(format_size $db_size)"
-                if confirm "    清理 $file_name？"; then
-                    rm -f "$db_file" 2>/dev/null
-                    TOTAL_FREED=$((TOTAL_FREED + db_size))
-                    print_success "    $file_name 已清理"
-                fi
-            fi
+    [ -f "$OPENCODE_DB_SHM" ] && OPENCODE_CLEANABLE=$((OPENCODE_CLEANABLE + $(get_size_bytes "$OPENCODE_DB_SHM")))
+    [ -f "$OPENCODE_DB_WAL" ] && OPENCODE_CLEANABLE=$((OPENCODE_CLEANABLE + $(get_size_bytes "$OPENCODE_DB_WAL")))
+
+    if [ "$OPENCODE_CLEANABLE" -gt 0 ]; then
+        echo -e "  ${CYAN}OpenCode 可清理缓存${NC}: $(format_size $OPENCODE_CLEANABLE)"
+        if confirm "  是否清理 OpenCode 缓存、执行快照、日志及数据库临时缓存？"; then
+            silent_clean_dir "$OPENCODE_CACHE" "OpenCode 浏览器缓存"
+            silent_clean_dir "$OPENCODE_DATA/tool-output" "OpenCode 工具输出缓存"
+            silent_clean_dir "$OPENCODE_DATA/log" "OpenCode 内部日志"
+            silent_clean_dir "$OPENCODE_DATA/snapshot" "OpenCode 运行快照"
+            silent_clean_dir "$OPENCODE_LOG" "OpenCode 系统日志"
+            if [ -f "$OPENCODE_DB_SHM" ]; then rm -f "$OPENCODE_DB_SHM" 2>/dev/null; fi
+            if [ -f "$OPENCODE_DB_WAL" ]; then rm -f "$OPENCODE_DB_WAL" 2>/dev/null; fi
+            print_success "  OpenCode 缓存清理完成"
+        else
+            print_info "  已跳过 OpenCode 缓存清理"
         fi
-    done
+    else
+        print_info "  未检测到 OpenCode 可清理缓存"
+    fi
 else
     print_info "  未检测到 OpenCode"
 fi
