@@ -666,68 +666,6 @@ clean_file_with_stats() {
 }
 
 # ----------------------------------------------------------------------------
-# 计算 SQLite 主库 + WAL + SHM 总大小（KB）
-# ----------------------------------------------------------------------------
-calculate_sqlite_bundle_size_kb() {
-    TARGET_DB="$1"
-    TOTAL_KB=0
-
-    for file_path in "$TARGET_DB" "$TARGET_DB-wal" "$TARGET_DB-shm"; do
-        SIZE_KB=$(calculate_path_size_kb "$file_path")
-        TOTAL_KB=$((TOTAL_KB + SIZE_KB))
-    done
-
-    echo "$TOTAL_KB"
-}
-
-# ----------------------------------------------------------------------------
-# 清空 Codex 日志数据库内容并压缩体积，保留数据库文件和结构
-# ----------------------------------------------------------------------------
-clean_codex_log_db_with_stats() {
-    TARGET_DB="$1"
-    TARGET_LABEL="$2"
-
-    echo ""
-    print_info "$TARGET_LABEL"
-
-    if [ ! -f "$TARGET_DB" ]; then
-        print_info "文件不存在，无需清理"
-        return 0
-    fi
-
-    BEFORE_KB=$(calculate_sqlite_bundle_size_kb "$TARGET_DB")
-    BEFORE_KB=${BEFORE_KB:-0}
-    print_info "清理前大小: $(format_kb_size "$BEFORE_KB")"
-    for file_path in "$TARGET_DB" "$TARGET_DB-wal" "$TARGET_DB-shm"; do
-        [ -e "$file_path" ] && du -sh "$file_path" 2>/dev/null | sed 's/^/  /'
-    done
-
-    if ! command -v sqlite3 >/dev/null 2>&1; then
-        print_warning "未找到 sqlite3，已跳过日志数据库清理"
-        return 0
-    fi
-
-    HAS_LOGS_TABLE=$(sqlite3 "$TARGET_DB" "SELECT name FROM sqlite_schema WHERE type='table' AND name='logs' LIMIT 1;" 2>/dev/null)
-    if [ "$HAS_LOGS_TABLE" != "logs" ]; then
-        print_warning "未找到 logs 表，已跳过: $TARGET_DB"
-        return 0
-    fi
-
-    if sqlite3 "$TARGET_DB" "PRAGMA busy_timeout=5000; PRAGMA wal_checkpoint(TRUNCATE); DELETE FROM logs; VACUUM; PRAGMA wal_checkpoint(TRUNCATE);" >/dev/null 2>&1; then
-        AFTER_KB=$(calculate_sqlite_bundle_size_kb "$TARGET_DB")
-        AFTER_KB=${AFTER_KB:-0}
-        RELEASED_KB=$((BEFORE_KB - AFTER_KB))
-        if [ "$RELEASED_KB" -lt 0 ]; then
-            RELEASED_KB=0
-        fi
-        TOTAL_RELEASED_KB=$((TOTAL_RELEASED_KB + RELEASED_KB))
-        print_success "已清空日志并压缩数据库，释放: $(format_kb_size "$RELEASED_KB")"
-    else
-        print_warning "日志数据库正在被占用或无法写入，已跳过；关闭 Codex 后再运行会更彻底"
-    fi
-}
-
-# ----------------------------------------------------------------------------
 # 计算单个路径大小（KB）
 # ----------------------------------------------------------------------------
 calculate_path_size_kb() {
@@ -738,74 +676,6 @@ calculate_path_size_kb() {
     else
         echo "0"
     fi
-}
-
-# ----------------------------------------------------------------------------
-# 计算 Codex .tmp 中可安全清理的非插件临时项大小（KB）
-# ----------------------------------------------------------------------------
-calculate_codex_safe_tmp_size_kb() {
-    if [ ! -d "$CODEX_DIR/.tmp" ]; then
-        echo "0"
-        return 0
-    fi
-
-    find "$CODEX_DIR/.tmp" -mindepth 1 -maxdepth 1 \
-        ! -name "plugins" \
-        ! -name "plugins-clone-*" \
-        ! -name "marketplaces" \
-        ! -name "bundled-marketplaces" \
-        ! -name "bundled-marketplaces.*" \
-        -exec du -sk {} + 2>/dev/null | awk '{sum+=$1} END{print sum+0}'
-}
-
-# ----------------------------------------------------------------------------
-# 清理 Codex .tmp 中非插件临时项，保留插件 marketplace 和 bundled 插件源
-# ----------------------------------------------------------------------------
-clean_codex_safe_tmp_with_stats() {
-    echo ""
-    print_info "清理 codex .tmp 非插件临时项"
-
-    if [ ! -d "$CODEX_DIR/.tmp" ]; then
-        print_info "目录不存在，无需清理"
-        return 0
-    fi
-
-    BEFORE_KB=$(calculate_codex_safe_tmp_size_kb)
-    BEFORE_KB=${BEFORE_KB:-0}
-
-    if [ "$BEFORE_KB" -le 0 ] 2>/dev/null; then
-        print_info "清理前大小: 0KB"
-        print_info "没有可安全清理的非插件临时项"
-        print_info "已保留: .tmp/plugins、.tmp/plugins-clone-*、.tmp/marketplaces、.tmp/bundled-marketplaces*"
-        return 0
-    fi
-
-    print_info "清理前大小: $(format_kb_size "$BEFORE_KB")"
-    find "$CODEX_DIR/.tmp" -mindepth 1 -maxdepth 1 \
-        ! -name "plugins" \
-        ! -name "plugins-clone-*" \
-        ! -name "marketplaces" \
-        ! -name "bundled-marketplaces" \
-        ! -name "bundled-marketplaces.*" \
-        -exec du -sh {} + 2>/dev/null | sed 's/^/  /'
-    find "$CODEX_DIR/.tmp" -mindepth 1 -maxdepth 1 \
-        ! -name "plugins" \
-        ! -name "plugins-clone-*" \
-        ! -name "marketplaces" \
-        ! -name "bundled-marketplaces" \
-        ! -name "bundled-marketplaces.*" \
-        -exec rm -rf {} + 2>/dev/null || true
-
-    AFTER_KB=$(calculate_codex_safe_tmp_size_kb)
-    AFTER_KB=${AFTER_KB:-0}
-    RELEASED_KB=$((BEFORE_KB - AFTER_KB))
-    if [ "$RELEASED_KB" -lt 0 ]; then
-        RELEASED_KB=0
-    fi
-
-    TOTAL_RELEASED_KB=$((TOTAL_RELEASED_KB + RELEASED_KB))
-    print_success "已释放: $(format_kb_size "$RELEASED_KB")"
-    print_info "已保留 Codex 插件相关目录: .tmp/plugins、.tmp/plugins-clone-*、.tmp/marketplaces、.tmp/bundled-marketplaces*、plugins/cache"
 }
 
 # ----------------------------------------------------------------------------
@@ -937,12 +807,12 @@ calculate_ai_tool_garbage_total_kb() {
     done
 
     # Codex 默认清理项
-    TOTAL_KB=$((TOTAL_KB + $(calculate_codex_safe_tmp_size_kb)))
     for dir_path in \
+        "$CODEX_DIR/.tmp" \
         "$CODEX_DIR/tmp" \
+        "$CODEX_DIR/cache" \
         "$CODEX_DIR/log" \
-        "$CODEX_DIR/node_repl" \
-        "$CODEX_DIR/shell_snapshots"
+        "$CODEX_DIR/plugins/cache"
     do
         SIZE_KB=$(calculate_dir_contents_size_kb "$dir_path")
         TOTAL_KB=$((TOTAL_KB + SIZE_KB))
@@ -952,8 +822,8 @@ calculate_ai_tool_garbage_total_kb() {
     for file_path in \
         "$CODEX_DIR/logs_1.sqlite-shm" \
         "$CODEX_DIR/logs_1.sqlite-wal" \
-        "$CODEX_DIR/logs_2.sqlite-shm" \
-        "$CODEX_DIR/logs_2.sqlite-wal"
+        "$CODEX_DIR/models_cache.json" \
+        "$CODEX_DIR/vendor_imports/skills-curated-cache.json"
     do
         SIZE_KB=$(calculate_path_size_kb "$file_path")
         TOTAL_KB=$((TOTAL_KB + SIZE_KB))
@@ -995,10 +865,7 @@ calculate_ai_tool_optional_garbage_total_kb() {
     TOTAL_KB=$((TOTAL_KB + $(calculate_dir_contents_size_kb "$GEMINI_CLI_DIR/tmp")))
 
     # Codex 可选清理项
-    for file_path in "$CODEX_DIR"/logs_*.sqlite; do
-        [ -f "$file_path" ] || continue
-        TOTAL_KB=$((TOTAL_KB + $(calculate_sqlite_bundle_size_kb "$file_path")))
-    done
+    TOTAL_KB=$((TOTAL_KB + $(calculate_path_size_kb "$CODEX_DIR/logs_1.sqlite")))
 
     echo "$TOTAL_KB"
 }
@@ -1025,22 +892,17 @@ clean_ai_tool_garbage() {
 
     SAFE_TOTAL_KB=$(calculate_ai_tool_garbage_total_kb)
     GEMINI_TMP_KB=$(calculate_dir_contents_size_kb "$GEMINI_CLI_DIR/tmp")
-    CODEX_LOG_DB_KB=0
-    for file_path in "$CODEX_DIR"/logs_*.sqlite; do
-        [ -f "$file_path" ] || continue
-        CODEX_LOG_DB_KB=$((CODEX_LOG_DB_KB + $(calculate_sqlite_bundle_size_kb "$file_path")))
-    done
+    CODEX_LOG_DB_KB=$(calculate_path_size_kb "$CODEX_DIR/logs_1.sqlite")
     OPTIONAL_TOTAL_KB=$(calculate_ai_tool_optional_garbage_total_kb)
 
     echo ""
     print_success "默认只清理缓存、日志、临时文件、工具输出和数据库临时文件"
     print_success "不会清理 MCP、登录认证、settings、skills、rules、memories、正式数据库、插件主体和安装目录"
-    print_success "Codex 会保留 plugins/cache、local-marketplaces、.tmp/plugins、.tmp/plugins-clone-*、.tmp/marketplaces、.tmp/bundled-marketplaces*，避免插件重启后丢失"
     print_warning "可选深清项只会影响本地日志或会话恢复能力，不会影响 MCP、登录状态和核心配置"
     echo ""
     echo -e "${CYAN}保护范围说明:${NC}"
     echo "  - Claude Code: mcp.json、config.json、settings.json、commands/、projects/、history.jsonl、MEMORY.md"
-    echo "  - codex: config.toml、auth.json、agents/、memories/、rules/、sessions/、history.jsonl、session_index.jsonl、plugins/、local-marketplaces/、skills/"
+    echo "  - codex: config.toml、auth.json、agents/、memories/、rules/、sessions/、history.jsonl、session_index.jsonl"
     echo "  - gemini-cli: settings.json、oauth_creds.json、skills/、policies/、history/、tmp/chats/"
     echo "  - opencode: opencode.json、auth.json、opencode.db、storage/session_diff、prompt-history.jsonl、node_modules/"
     echo ""
@@ -1073,15 +935,12 @@ clean_ai_tool_garbage() {
     if [ -d "$CODEX_DIR" ]; then
         echo ""
         echo -e "  ${GREEN}[codex]${NC} $CODEX_DIR"
-        SAFE_TMP_KB=$(calculate_codex_safe_tmp_size_kb)
-        if [ "$SAFE_TMP_KB" -gt 0 ] 2>/dev/null; then
-            echo "    .tmp（仅非插件临时项） -> $(format_kb_size "$SAFE_TMP_KB")"
-        fi
         for dir_path in \
+            "$CODEX_DIR/.tmp" \
             "$CODEX_DIR/tmp" \
+            "$CODEX_DIR/cache" \
             "$CODEX_DIR/log" \
-            "$CODEX_DIR/node_repl" \
-            "$CODEX_DIR/shell_snapshots"
+            "$CODEX_DIR/plugins/cache"
         do
             if [ -d "$dir_path" ]; then
                 SIZE_KB=$(calculate_dir_contents_size_kb "$dir_path")
@@ -1091,8 +950,8 @@ clean_ai_tool_garbage() {
         for file_path in \
             "$CODEX_DIR/logs_1.sqlite-shm" \
             "$CODEX_DIR/logs_1.sqlite-wal" \
-            "$CODEX_DIR/logs_2.sqlite-shm" \
-            "$CODEX_DIR/logs_2.sqlite-wal"
+            "$CODEX_DIR/models_cache.json" \
+            "$CODEX_DIR/vendor_imports/skills-curated-cache.json"
         do
             if [ -e "$file_path" ]; then
                 SIZE_KB=$(calculate_path_size_kb "$file_path")
@@ -1100,9 +959,8 @@ clean_ai_tool_garbage() {
             fi
         done
         if [ "$CODEX_LOG_DB_KB" -gt 0 ] 2>/dev/null; then
-            echo "    logs_*.sqlite（可选深清，仅清空日志表并压缩） -> $(format_kb_size "$CODEX_LOG_DB_KB")"
+            echo "    logs_1.sqlite（可选深清） -> $(format_kb_size "$CODEX_LOG_DB_KB")"
         fi
-        echo "    已保护: plugins/cache、local-marketplaces、.tmp/plugins、.tmp/plugins-clone-*、.tmp/marketplaces、.tmp/bundled-marketplaces*、skills、sessions、memories"
     fi
 
     if [ -d "$GEMINI_CLI_DIR" ]; then
@@ -1169,16 +1027,15 @@ clean_ai_tool_garbage() {
             clean_dir_contents_with_stats "$CLAUDE_CODE_DIR/metrics"                      "清理 Claude Code 指标数据"
             clean_dir_contents_with_stats "$CLAUDE_CODE_DIR/telemetry"                    "清理 Claude Code 遥测数据"
 
-            clean_codex_safe_tmp_with_stats
+            clean_dir_contents_with_stats "$CODEX_DIR/.tmp"                               "清理 codex .tmp"
             clean_dir_contents_with_stats "$CODEX_DIR/tmp"                                "清理 codex tmp"
+            clean_dir_contents_with_stats "$CODEX_DIR/cache"                              "清理 codex cache"
             clean_dir_contents_with_stats "$CODEX_DIR/log"                                "清理 codex 日志目录"
-            clean_dir_contents_with_stats "$CODEX_DIR/node_repl"                          "清理 codex node_repl 临时目录"
-            clean_dir_contents_with_stats "$CODEX_DIR/shell_snapshots"                    "清理 codex shell 快照"
+            clean_dir_contents_with_stats "$CODEX_DIR/plugins/cache"                      "清理 codex 插件缓存"
             clean_file_with_stats "$CODEX_DIR/logs_1.sqlite-shm"                          "清理 codex 日志数据库 shm"
             clean_file_with_stats "$CODEX_DIR/logs_1.sqlite-wal"                          "清理 codex 日志数据库 wal"
-            clean_file_with_stats "$CODEX_DIR/logs_2.sqlite-shm"                          "清理 codex 日志数据库 shm"
-            clean_file_with_stats "$CODEX_DIR/logs_2.sqlite-wal"                          "清理 codex 日志数据库 wal"
-            print_info "已跳过 codex 插件和 marketplace: plugins/cache、local-marketplaces、.tmp/plugins、.tmp/plugins-clone-*、.tmp/marketplaces、.tmp/bundled-marketplaces*"
+            clean_file_with_stats "$CODEX_DIR/models_cache.json"                          "清理 codex models_cache.json"
+            clean_file_with_stats "$CODEX_DIR/vendor_imports/skills-curated-cache.json"   "清理 codex skills 缓存索引"
 
             clean_dir_contents_with_stats "$OPENCODE_CACHE_DIR"                           "清理 opencode cache"
             clean_dir_contents_with_stats "$OPENCODE_DATA_DIR/tool-output"                "清理 opencode tool-output"
@@ -1206,18 +1063,15 @@ clean_ai_tool_garbage() {
     fi
 
     if [ "$CODEX_LOG_DB_KB" -gt 0 ] 2>/dev/null; then
-        echo -ne ${YELLOW}是否额外清理 codex logs_*.sqlite？只清空本地运行日志，不清理对话/记忆/插件 [y/N]: ${NC}
+        echo -ne ${YELLOW}是否额外清理 codex logs_1.sqlite？这会清空本地日志数据库 [y/N]: ${NC}
         read -r EXTRA_CHOICE
         case "$EXTRA_CHOICE" in
             y|Y )
-                for file_path in "$CODEX_DIR"/logs_*.sqlite; do
-                    [ -f "$file_path" ] || continue
-                    clean_codex_log_db_with_stats "$file_path" "额外清理 codex 日志数据库: $(basename "$file_path")"
-                done
+                clean_file_with_stats "$CODEX_DIR/logs_1.sqlite" "额外清理 codex 日志数据库"
                 DID_CLEAN=1
                 ;;
             * )
-                print_info "已保留 codex logs_*.sqlite"
+                print_info "已保留 codex logs_1.sqlite"
                 ;;
         esac
     fi
