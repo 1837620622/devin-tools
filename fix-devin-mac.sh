@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # ============================================================================
-# Devin 修复工具 - macOS 版本
-# 用于修复 Devin IDE 卡顿、Shell无法连接等常见问题
-# 基于官方文档: https://docs.devin.com/troubleshooting/devin-common-issues
+# Windsurf 修复工具 - macOS 版本
+# 用于修复 Windsurf IDE 卡顿、Shell无法连接等常见问题
+# 基于官方文档: https://docs.windsurf.com/troubleshooting/windsurf-common-issues
 # 作者: 传康KK
-# GitHub: https://github.com/1837620622/devin-fix-tool
+# GitHub: https://github.com/1837620622/windsurf-fix-tool
 # ============================================================================
 
 # ----------------------------------------------------------------------------
@@ -24,14 +24,14 @@ NC='\033[0m'
 # 路径定义
 # ----------------------------------------------------------------------------
 CODEIUM_DIR="$HOME/.codeium"
-DEVIN_DIR="$CODEIUM_DIR/devin"
-CASCADE_DIR="$DEVIN_DIR/cascade"
-DEVIN_APP="/Applications/Devin.app"
-BACKUP_DIR="$HOME/.devin-backup-$(date +%Y%m%d_%H%M%S)"
-DEVIN_SUPPORT_DIR="$HOME/Library/Application Support/Devin"
-DEVIN_RUNTIME_DIR="$DEVIN_SUPPORT_DIR"
-IMPLICIT_DIR="$DEVIN_DIR/implicit"
-CODE_TRACKER_DIR="$DEVIN_DIR/code_tracker"
+WINDSURF_DIR="$CODEIUM_DIR/windsurf"
+CASCADE_DIR="$WINDSURF_DIR/cascade"
+WINDSURF_APP="/Applications/Windsurf.app"
+BACKUP_DIR="$HOME/.windsurf-backup-$(date +%Y%m%d_%H%M%S)"
+WINDSURF_SUPPORT_DIR="$HOME/Library/Application Support/Windsurf"
+WINDSURF_RUNTIME_DIR="$WINDSURF_SUPPORT_DIR"
+IMPLICIT_DIR="$WINDSURF_DIR/implicit"
+CODE_TRACKER_DIR="$WINDSURF_DIR/code_tracker"
 MACOS_WS_CACHE="$HOME/Library/Caches/com.exafunction.windsurf"
 MACOS_WS_SHIPIT="$HOME/Library/Caches/com.exafunction.windsurf.ShipIt"
 XDG_CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -58,19 +58,19 @@ OPENCODE_DATA_DIR="$XDG_DATA_ROOT/opencode"
 print_header() {
     echo ""
     echo -e "${CYAN}========================================${NC}"
-    echo -e "${CYAN}  Devin 修复工具 - macOS${NC}"
+    echo -e "${CYAN}  Windsurf 修复工具 - macOS${NC}"
     echo -e "${CYAN}  by 传康KK${NC}"
-    echo -e "${CYAN}  github.com/1837620622/devin-fix-tool${NC}"
+    echo -e "${CYAN}  github.com/1837620622/windsurf-fix-tool${NC}"
     echo -e "${CYAN}========================================${NC}"
     echo ""
     # ── 运行模式提示 ─────────────────────────────────────────────────
     if [ "${FORCE_RESET_ID:-1}" = "0" ] || [ "${FORCE_RESET_ID:-1}" = "false" ]; then
         echo -e "${GREEN}[当前模式] 保守模式${NC}（FORCE_RESET_ID=0）——清理不重置设备 ID，保留登录态"
     else
-        echo -e "${RED}[当前模式] 强制重置模式${NC}（默认）——所有清理菜单完成后自动重置 Devin 设备 ID"
-        echo -e "  ${YELLOW}⚠ 重置后 Devin 会被识别为新设备，可能需要重新登录一次${NC}"
+        echo -e "${RED}[当前模式] 强制重置模式${NC}（默认）——所有清理菜单完成后自动重置 Windsurf 设备 ID"
+        echo -e "  ${YELLOW}⚠ 重置后 Windsurf 会被识别为新设备，可能需要重新登录一次${NC}"
         echo -e "  ${YELLOW}⚠ 用途：绕过限速、刷新免费额度、解决服务端缓存异常${NC}"
-        echo -e "  如需关闭强制重置：${CYAN}FORCE_RESET_ID=0 bash fix-devin-mac.sh${NC}"
+        echo -e "  如需关闭强制重置：${CYAN}FORCE_RESET_ID=0 bash fix-windsurf-mac.sh${NC}"
     fi
     echo ""
     echo -e "${GREEN}[始终保留]${NC} 对话和用户数据，任何模式下都不会被清理："
@@ -79,10 +79,10 @@ print_header() {
     echo -e "  • ${CYAN}~/.codeium/windsurf/skills/${NC}                   技能"
     echo -e "  • ${CYAN}~/.codeium/windsurf/mcp_config.json${NC}          MCP 配置"
     echo -e "  • ${CYAN}~/.codeium/windsurf/user_settings.pb${NC}          用户偏好"
-    echo -e "  • ${CYAN}Application Support/Devin/User/settings.json${NC}  编辑器设置"
+    echo -e "  • ${CYAN}Application Support/Windsurf/User/settings.json${NC}  编辑器设置"
     echo ""
     echo -e "${RED}[清理后会被强制重置]${NC} 仅在强制重置模式下（默认）："
-    echo -e "  • ${CYAN}installation_id${NC}                              Devin 安装标识"
+    echo -e "  • ${CYAN}installation_id${NC}                              Windsurf 安装标识"
     echo -e "  • ${CYAN}machineid${NC}                                    机器标识"
     echo -e "  • ${CYAN}storage.json${NC} 中的 telemetry.devDeviceId/macMachineId/machineId/sqmId"
     echo ""
@@ -133,34 +133,34 @@ detect_system_info() {
     echo ""
     echo -e "  处理器类型: ${GREEN}$PROCESSOR_TYPE${NC}"
     echo -e "  macOS版本: ${GREEN}$MACOS_VERSION${NC}"
-    echo -e "  Devin路径: ${GREEN}$DEVIN_APP${NC}"
+    echo -e "  Windsurf路径: ${GREEN}$WINDSURF_APP${NC}"
     echo ""
 }
 
 # ----------------------------------------------------------------------------
-# 检查Devin是否正在运行
+# 检查Windsurf是否正在运行
 # ----------------------------------------------------------------------------
-check_devin_running() {
-    if pgrep -x "Devin" > /dev/null 2>&1; then
-        print_warning "检测到 Devin 正在运行"
-        echo -e "  请先关闭 Devin 再执行修复操作"
+check_windsurf_running() {
+    if pgrep -x "Windsurf" > /dev/null 2>&1; then
+        print_warning "检测到 Windsurf 正在运行"
+        echo -e "  请先关闭 Windsurf 再执行修复操作"
         if [ "${TERM_PROGRAM:-}" = "vscode" ]; then
-            print_warning "当前看起来是在 Devin / VS Code 类内置终端中运行"
-            echo -e "  如果在这里自动关闭 Devin，当前终端会一起消失，看起来就像“没反应”"
-            echo -e "  建议先手动关闭 Devin，再从 Terminal.app 或 iTerm 重新运行脚本"
+            print_warning "当前看起来是在 Windsurf / VS Code 类内置终端中运行"
+            echo -e "  如果在这里自动关闭 Windsurf，当前终端会一起消失，看起来就像“没反应”"
+            echo -e "  建议先手动关闭 Windsurf，再从 Terminal.app 或 iTerm 重新运行脚本"
             return 1
         fi
-        echo -ne ${YELLOW}是否自动关闭Devin？[y/N]: ${NC}
+        echo -ne ${YELLOW}是否自动关闭Windsurf？[y/N]: ${NC}
         read -r choice
         case "$choice" in
             y|Y )
-                pkill -x "Devin" 2>/dev/null || true
+                pkill -x "Windsurf" 2>/dev/null || true
                 sleep 2
-                print_success "Devin 已关闭"
+                print_success "Windsurf 已关闭"
                 return 0
                 ;;
             * )
-                print_error "请手动关闭 Devin 后重试"
+                print_error "请手动关闭 Windsurf 后重试"
                 return 1
                 ;;
         esac
@@ -209,10 +209,10 @@ clean_extension_cache() {
 
         # 优先清理 Electron 运行时目录中的实际缓存路径，兼容旧版目录结构。
         for cache_dir in \
-            "$DEVIN_RUNTIME_DIR/CachedData" \
-            "$DEVIN_RUNTIME_DIR/CachedExtensionVSIXs" \
-            "$DEVIN_DIR/CachedData" \
-            "$DEVIN_DIR/CachedExtensions"; do
+            "$WINDSURF_RUNTIME_DIR/CachedData" \
+            "$WINDSURF_RUNTIME_DIR/CachedExtensionVSIXs" \
+            "$WINDSURF_DIR/CachedData" \
+            "$WINDSURF_DIR/CachedExtensions"; do
             if [ -d "$cache_dir" ]; then
                 rm -rf "$cache_dir"
                 print_success "已清理 $(basename "$cache_dir")"
@@ -234,29 +234,29 @@ clean_extension_cache() {
 }
 
 # ----------------------------------------------------------------------------
-# 功能12: 修复"Devin已损坏"问题
+# 功能12: 修复"Windsurf已损坏"问题
 # ----------------------------------------------------------------------------
 fix_damaged_app() {
-    print_info "修复 'Devin已损坏' 问题..."
+    print_info "修复 'Windsurf已损坏' 问题..."
     
-    if [ ! -d "$DEVIN_APP" ]; then
-        print_error "未找到 Devin 应用: $DEVIN_APP"
-        print_info "请确保 Devin 已安装在 /Applications 目录"
+    if [ ! -d "$WINDSURF_APP" ]; then
+        print_error "未找到 Windsurf 应用: $WINDSURF_APP"
+        print_info "请确保 Windsurf 已安装在 /Applications 目录"
         return 0
     fi
     
     echo ""
-    echo "此操作将执行: xattr -c \"$DEVIN_APP\""
+    echo "此操作将执行: xattr -c \"$WINDSURF_APP\""
     echo "用于清除隔离属性，解决macOS安全提示问题"
     echo ""
     
     if confirm_action; then
-        xattr -c "$DEVIN_APP"
+        xattr -c "$WINDSURF_APP"
         print_success "已清除隔离属性"
         
         # 同时清除可能的代码签名问题
-        xattr -cr "$DEVIN_APP" 2>/dev/null || true
-        print_info "提示: 如果问题仍然存在，请尝试重新下载 Devin"
+        xattr -cr "$WINDSURF_APP" 2>/dev/null || true
+        print_info "提示: 如果问题仍然存在，请尝试重新下载 Windsurf"
     else
         print_info "已取消操作"
     fi
@@ -268,7 +268,7 @@ fix_damaged_app() {
 configure_terminal_settings() {
     print_info "配置终端设置..."
     
-    SETTINGS_JSON="$HOME/Library/Application Support/Devin/User/settings.json"
+    SETTINGS_JSON="$HOME/Library/Application Support/Windsurf/User/settings.json"
     
     echo ""
     echo "推荐的终端配置:"
@@ -287,7 +287,7 @@ configure_terminal_settings() {
         fi
     else
         print_warning "未找到 settings.json 文件"
-        print_info "Devin 可能尚未创建配置文件，请先启动一次 Devin"
+        print_info "Windsurf 可能尚未创建配置文件，请先启动一次 Windsurf"
     fi
 }
 
@@ -340,11 +340,11 @@ detect_zsh_theme_conflicts() {
         echo "  # eval \"\$(oh-my-posh init zsh)\""
         echo ""
         
-        echo -ne ${YELLOW}是否创建Devin专用的简化zshrc？[y/N]: ${NC}
+        echo -ne ${YELLOW}是否创建Windsurf专用的简化zshrc？[y/N]: ${NC}
         read -r choice
         case "$choice" in
             y|Y )
-                create_devin_zshrc
+                create_windsurf_zshrc
                 ;;
         esac
     else
@@ -353,17 +353,17 @@ detect_zsh_theme_conflicts() {
 }
 
 # ----------------------------------------------------------------------------
-# 创建Devin专用zshrc
+# 创建Windsurf专用zshrc
 # ----------------------------------------------------------------------------
-create_devin_zshrc() {
-    DEVIN_ZSHRC="$HOME/.zshrc.devin"
+create_windsurf_zshrc() {
+    WINDSURF_ZSHRC="$HOME/.zshrc.windsurf"
     
-    cat > "$DEVIN_ZSHRC" << 'EOF'
+    cat > "$WINDSURF_ZSHRC" << 'EOF'
 # ============================================================================
-# Devin 专用 zsh 配置
+# Windsurf 专用 zsh 配置
 # 此配置文件用于解决复杂主题导致的终端卡住问题
-# 使用方法: 在 Devin 设置中配置 shell 参数为:
-#   "terminal.integrated.shellArgs.osx": ["--rcfile", "~/.zshrc.devin"]
+# 使用方法: 在 Windsurf 设置中配置 shell 参数为:
+#   "terminal.integrated.shellArgs.osx": ["--rcfile", "~/.zshrc.windsurf"]
 # ============================================================================
 
 # 基础环境变量
@@ -388,10 +388,10 @@ setopt SHARE_HISTORY
 autoload -Uz compinit && compinit
 EOF
     
-    print_success "已创建 Devin 专用 zshrc: $DEVIN_ZSHRC"
+    print_success "已创建 Windsurf 专用 zshrc: $WINDSURF_ZSHRC"
     echo ""
-    print_info "使用方法: 在 Devin 设置中添加:"
-    echo '  "terminal.integrated.shellArgs.osx": ["--rcfile", "~/.zshrc.devin"]'
+    print_info "使用方法: 在 Windsurf 设置中添加:"
+    echo '  "terminal.integrated.shellArgs.osx": ["--rcfile", "~/.zshrc.windsurf"]'
 }
 
 # ----------------------------------------------------------------------------
@@ -400,11 +400,11 @@ EOF
 generate_diagnostic_report() {
     print_info "生成诊断报告..."
     
-    REPORT_FILE="$HOME/devin-diagnostic-$(date +%Y%m%d_%H%M%S).txt"
+    REPORT_FILE="$HOME/windsurf-diagnostic-$(date +%Y%m%d_%H%M%S).txt"
     
     {
         echo "=========================================="
-        echo "Devin 诊断报告"
+        echo "Windsurf 诊断报告"
         echo "生成时间: $(date)"
         echo "=========================================="
         echo ""
@@ -415,12 +415,12 @@ generate_diagnostic_report() {
         echo "macOS构建: $(sw_vers -buildVersion)"
         echo ""
         
-        echo "## Devin 安装状态"
-        if [ -d "$DEVIN_APP" ]; then
-            echo "Devin.app: 已安装"
-            ls -la "$DEVIN_APP" 2>/dev/null | head -5
+        echo "## Windsurf 安装状态"
+        if [ -d "$WINDSURF_APP" ]; then
+            echo "Windsurf.app: 已安装"
+            ls -la "$WINDSURF_APP" 2>/dev/null | head -5
         else
-            echo "Devin.app: 未找到"
+            echo "Windsurf.app: 未找到"
         fi
         echo ""
         
@@ -461,9 +461,9 @@ generate_diagnostic_report() {
         df -h / 2>/dev/null | head -2
         echo ""
 
-        echo "## Devin 关键数据库大小"
-        STATE_DB="$DEVIN_SUPPORT_DIR/User/globalStorage/state.vscdb"
-        STATE_DB_BACKUP="$DEVIN_SUPPORT_DIR/User/globalStorage/state.vscdb.backup"
+        echo "## Windsurf 关键数据库大小"
+        STATE_DB="$WINDSURF_SUPPORT_DIR/User/globalStorage/state.vscdb"
+        STATE_DB_BACKUP="$WINDSURF_SUPPORT_DIR/User/globalStorage/state.vscdb.backup"
         if [ -f "$STATE_DB" ]; then
             echo "state.vscdb:"
             du -sh "$STATE_DB" 2>/dev/null
@@ -478,7 +478,7 @@ generate_diagnostic_report() {
         fi
         echo ""
 
-        echo "## Devin implicit 索引缓存"
+        echo "## Windsurf implicit 索引缓存"
         if [ -d "$IMPLICIT_DIR" ]; then
             du -sh "$IMPLICIT_DIR" 2>/dev/null || echo "无法计算 implicit 目录大小"
         else
@@ -487,30 +487,30 @@ generate_diagnostic_report() {
         echo ""
 
         echo "## /tmp 终端快照"
-        SNAPSHOT_COUNT=$(ls /tmp/devin-terminal-*.snapshot 2>/dev/null | wc -l | tr -d ' ')
-        echo "devin-terminal-*.snapshot 数量: $SNAPSHOT_COUNT"
+        SNAPSHOT_COUNT=$(ls /tmp/windsurf-terminal-*.snapshot 2>/dev/null | wc -l | tr -d ' ')
+        echo "windsurf-terminal-*.snapshot 数量: $SNAPSHOT_COUNT"
         echo ""
 
-        echo "## Devin 进程信息"
-        WS_PROCESS_INFO=$(ps aux | grep -i "[w]indsurf" | grep -v "fix-devin-mac.sh")
+        echo "## Windsurf 进程信息"
+        WS_PROCESS_INFO=$(ps aux | grep -i "[w]indsurf" | grep -v "fix-windsurf-mac.sh")
         if [ -n "$WS_PROCESS_INFO" ]; then
             echo "$WS_PROCESS_INFO"
         else
-            echo "未检测到 Devin 相关进程"
+            echo "未检测到 Windsurf 相关进程"
         fi
         echo ""
 
-        echo "## Devin 缓存目录详细大小"
+        echo "## Windsurf 缓存目录详细大小"
         for cache_dir in \
-            "$DEVIN_SUPPORT_DIR/Cache/Cache_Data" \
-            "$DEVIN_SUPPORT_DIR/CachedData" \
-            "$DEVIN_SUPPORT_DIR/GPUCache" \
-            "$DEVIN_SUPPORT_DIR/Code Cache" \
-            "$DEVIN_SUPPORT_DIR/logs" \
-            "$DEVIN_SUPPORT_DIR/Crashpad/completed" \
-            "$DEVIN_SUPPORT_DIR/Crashpad/pending" \
-            "$DEVIN_SUPPORT_DIR/Service Worker/CacheStorage" \
-            "$DEVIN_SUPPORT_DIR/Service Worker/ScriptCache" \
+            "$WINDSURF_SUPPORT_DIR/Cache/Cache_Data" \
+            "$WINDSURF_SUPPORT_DIR/CachedData" \
+            "$WINDSURF_SUPPORT_DIR/GPUCache" \
+            "$WINDSURF_SUPPORT_DIR/Code Cache" \
+            "$WINDSURF_SUPPORT_DIR/logs" \
+            "$WINDSURF_SUPPORT_DIR/Crashpad/completed" \
+            "$WINDSURF_SUPPORT_DIR/Crashpad/pending" \
+            "$WINDSURF_SUPPORT_DIR/Service Worker/CacheStorage" \
+            "$WINDSURF_SUPPORT_DIR/Service Worker/ScriptCache" \
             "$MACOS_WS_CACHE" \
             "$MACOS_WS_SHIPIT"
         do
@@ -536,7 +536,7 @@ full_repair() {
     print_warning "此操作将执行所有修复步骤"
     
     if confirm_action; then
-        if ! check_devin_running; then
+        if ! check_windsurf_running; then
             return 1
         fi
         # 标记批量模式：子函数跳过各自的 auto_reset_after_clean
@@ -561,7 +561,7 @@ full_repair() {
 
         # 统一在完整修复末尾执行一次强制重置
         auto_reset_after_clean
-        print_info "请重新启动 Devin"
+        print_info "请重新启动 Windsurf"
     else
         print_info "已取消操作"
     fi
@@ -738,23 +738,23 @@ calculate_runtime_cache_total_kb() {
     TOTAL_KB=0
 
     for pattern in \
-        "$DEVIN_SUPPORT_DIR/Cache/*" \
-        "$DEVIN_SUPPORT_DIR/CachedData/*" \
-        "$DEVIN_SUPPORT_DIR/GPUCache/*" \
-        "$DEVIN_SUPPORT_DIR/Code Cache/*" \
-        "$DEVIN_SUPPORT_DIR/DawnWebGPUCache/*" \
-        "$DEVIN_SUPPORT_DIR/DawnGraphiteCache/*" \
-        "$DEVIN_SUPPORT_DIR/Shared Dictionary/*" \
-        "$DEVIN_SUPPORT_DIR/logs/*" \
-        "$DEVIN_SUPPORT_DIR/Crashpad/completed/*" \
-        "$DEVIN_SUPPORT_DIR/Crashpad/pending/*" \
-        "$DEVIN_SUPPORT_DIR/User/workspaceStorage/*" \
-        "$DEVIN_SUPPORT_DIR/User/History/*" \
-        "$DEVIN_SUPPORT_DIR/CachedExtensionVSIXs/*" \
-        "$DEVIN_SUPPORT_DIR/CachedProfilesData/*" \
+        "$WINDSURF_SUPPORT_DIR/Cache/*" \
+        "$WINDSURF_SUPPORT_DIR/CachedData/*" \
+        "$WINDSURF_SUPPORT_DIR/GPUCache/*" \
+        "$WINDSURF_SUPPORT_DIR/Code Cache/*" \
+        "$WINDSURF_SUPPORT_DIR/DawnWebGPUCache/*" \
+        "$WINDSURF_SUPPORT_DIR/DawnGraphiteCache/*" \
+        "$WINDSURF_SUPPORT_DIR/Shared Dictionary/*" \
+        "$WINDSURF_SUPPORT_DIR/logs/*" \
+        "$WINDSURF_SUPPORT_DIR/Crashpad/completed/*" \
+        "$WINDSURF_SUPPORT_DIR/Crashpad/pending/*" \
+        "$WINDSURF_SUPPORT_DIR/User/workspaceStorage/*" \
+        "$WINDSURF_SUPPORT_DIR/User/History/*" \
+        "$WINDSURF_SUPPORT_DIR/CachedExtensionVSIXs/*" \
+        "$WINDSURF_SUPPORT_DIR/CachedProfilesData/*" \
         "$IMPLICIT_DIR/*" \
         "$CODE_TRACKER_DIR/*" \
-        "/tmp/devin-terminal-*.snapshot" \
+        "/tmp/windsurf-terminal-*.snapshot" \
         "$HOME/.zcompdump*" \
         "$MACOS_WS_CACHE/*" \
         "$MACOS_WS_SHIPIT/*"
@@ -765,14 +765,14 @@ calculate_runtime_cache_total_kb() {
 
     # state.vscdb.backup 单独计算
     STATE_BACKUP_SIZE=0
-    if [ -f "$DEVIN_SUPPORT_DIR/User/globalStorage/state.vscdb.backup" ]; then
-        STATE_BACKUP_SIZE=$(du -sk "$DEVIN_SUPPORT_DIR/User/globalStorage/state.vscdb.backup" 2>/dev/null | awk '{print $1}')
+    if [ -f "$WINDSURF_SUPPORT_DIR/User/globalStorage/state.vscdb.backup" ]; then
+        STATE_BACKUP_SIZE=$(du -sk "$WINDSURF_SUPPORT_DIR/User/globalStorage/state.vscdb.backup" 2>/dev/null | awk '{print $1}')
         STATE_BACKUP_SIZE=${STATE_BACKUP_SIZE:-0}
     fi
     TOTAL_KB=$((TOTAL_KB + STATE_BACKUP_SIZE))
 
     # clp 旧版本语言包也纳入统计
-    CLP_DIR="$DEVIN_SUPPORT_DIR/clp"
+    CLP_DIR="$WINDSURF_SUPPORT_DIR/clp"
     if [ -d "$CLP_DIR" ]; then
         CLP_SIZE=$(du -sk "$CLP_DIR" 2>/dev/null | awk '{print $1}')
         TOTAL_KB=$((TOTAL_KB + ${CLP_SIZE:-0}))
@@ -1111,7 +1111,7 @@ clean_ai_tool_garbage() {
         print_success "四个 AI 工具垃圾缓存清理完成，总释放空间: $(format_kb_size "$TOTAL_RELEASED_KB")"
         print_info "核心配置、MCP、登录认证、skills、history 和正式数据库均已保留"
 
-        # 清理完毕 -> 强制重置 Devin 设备 ID（默认行为）
+        # 清理完毕 -> 强制重置 Windsurf 设备 ID（默认行为）
         auto_reset_after_clean
     else
         print_info "未执行任何清理操作"
@@ -1125,12 +1125,12 @@ backup_mcp_skills_rules() {
     print_info "备份 MCP 配置、Skills 和全局 Rules..."
     
     BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-    BACKUP_TARGET="$HOME/.devin-config-backup-$BACKUP_TIMESTAMP"
+    BACKUP_TARGET="$HOME/.windsurf-config-backup-$BACKUP_TIMESTAMP"
     
-    MCP_CONFIG="$DEVIN_DIR/mcp_config.json"
-    SKILLS_DIR="$DEVIN_DIR/skills"
-    GLOBAL_RULES="$DEVIN_DIR/memories/global_rules.md"
-    MEMORIES_DIR="$DEVIN_DIR/memories"
+    MCP_CONFIG="$WINDSURF_DIR/mcp_config.json"
+    SKILLS_DIR="$WINDSURF_DIR/skills"
+    GLOBAL_RULES="$WINDSURF_DIR/memories/global_rules.md"
+    MEMORIES_DIR="$WINDSURF_DIR/memories"
     
     echo ""
     echo -e "${CYAN}将备份以下内容:${NC}"
@@ -1214,7 +1214,7 @@ backup_mcp_skills_rules() {
         # 生成备份信息文件
         cat > "$BACKUP_TARGET/backup_info.txt" << BEOF
 ========================================
-Devin 配置备份信息
+Windsurf 配置备份信息
 ========================================
 备份时间: $(date)
 macOS版本: $(sw_vers -productVersion)
@@ -1242,14 +1242,14 @@ BEOF
         # 列出历史备份
         echo ""
         HIST_COUNT=0
-        for bdir in "$HOME"/.devin-config-backup-*; do
+        for bdir in "$HOME"/.windsurf-config-backup-*; do
             if [ -d "$bdir" ]; then
                 HIST_COUNT=$((HIST_COUNT + 1))
             fi
         done
         if [ $HIST_COUNT -gt 1 ]; then
             print_info "当前共有 $HIST_COUNT 个配置备份:"
-            for bdir in "$HOME"/.devin-config-backup-*; do
+            for bdir in "$HOME"/.windsurf-config-backup-*; do
                 if [ -d "$bdir" ]; then
                     BSIZE=$(du -sh "$bdir" 2>/dev/null | awk '{print $1}')
                     echo "  $(basename "$bdir") - $BSIZE"
@@ -1267,14 +1267,14 @@ BEOF
 restore_mcp_skills_rules() {
     print_info "还原 MCP 配置、Skills 和全局 Rules..."
     
-    MCP_CONFIG="$DEVIN_DIR/mcp_config.json"
-    SKILLS_DIR="$DEVIN_DIR/skills"
-    GLOBAL_RULES="$DEVIN_DIR/memories/global_rules.md"
-    MEMORIES_DIR="$DEVIN_DIR/memories"
+    MCP_CONFIG="$WINDSURF_DIR/mcp_config.json"
+    SKILLS_DIR="$WINDSURF_DIR/skills"
+    GLOBAL_RULES="$WINDSURF_DIR/memories/global_rules.md"
+    MEMORIES_DIR="$WINDSURF_DIR/memories"
     
     # 扫描所有配置备份目录
     BACKUP_LIST=()
-    for bdir in "$HOME"/.devin-config-backup-*; do
+    for bdir in "$HOME"/.windsurf-config-backup-*; do
         if [ -d "$bdir" ]; then
             BACKUP_LIST+=("$bdir")
         fi
@@ -1295,7 +1295,7 @@ restore_mcp_skills_rules() {
         BNAME=$(basename "$bdir")
         BSIZE=$(du -sh "$bdir" 2>/dev/null | awk '{print $1}')
         # 从目录名提取时间戳并格式化显示
-        BTIMESTAMP=$(echo "$BNAME" | sed 's/\.devin-config-backup-//')
+        BTIMESTAMP=$(echo "$BNAME" | sed 's/\.windsurf-config-backup-//')
         
         # 检测备份中包含哪些内容
         CONTENTS=""
@@ -1435,22 +1435,22 @@ restore_mcp_skills_rules() {
         
         echo ""
         print_success "还原完成！"
-        print_info "请重启 Devin 使更改生效"
+        print_info "请重启 Windsurf 使更改生效"
     else
         print_info "已取消操作"
     fi
 }
 
 # ----------------------------------------------------------------------------
-# 功能17: 重置 Devin ID
+# 功能17: 重置 Windsurf ID
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
-# 内部函数: 自动重置 Devin ID（无确认提示，供清理流程自动调用）
+# 内部函数: 自动重置 Windsurf ID（无确认提示，供清理流程自动调用）
 # ----------------------------------------------------------------------------
-reset_devin_id_auto() {
-    INSTALLATION_ID_FILE="$DEVIN_DIR/installation_id"
-    MACHINE_ID_FILE="$DEVIN_SUPPORT_DIR/machineid"
-    STORAGE_JSON="$DEVIN_SUPPORT_DIR/User/globalStorage/storage.json"
+reset_windsurf_id_auto() {
+    INSTALLATION_ID_FILE="$WINDSURF_DIR/installation_id"
+    MACHINE_ID_FILE="$WINDSURF_SUPPORT_DIR/machineid"
+    STORAGE_JSON="$WINDSURF_SUPPORT_DIR/User/globalStorage/storage.json"
     
     # 生成新的 UUID
     NEW_INSTALL_ID=$(uuidgen | tr '[:upper:]' '[:lower:]')
@@ -1490,9 +1490,9 @@ PYEOF
 
     # 【关键补强】重置 state.vscdb 的 ItemTable 中的 telemetry 键
     # 参考：cursor-free-vip、ai-auto-free 等社区方案
-    # VSCode/Devin 的 globalStorage 不仅在 storage.json 中记录 telemetry，还在 state.vscdb 的 ItemTable 里镜像了一份
+    # VSCode/Windsurf 的 globalStorage 不仅在 storage.json 中记录 telemetry，还在 state.vscdb 的 ItemTable 里镜像了一份
     # 只改 storage.json 的话，启动后可能从 state.vscdb 读回旧值
-    STATE_DB="$DEVIN_SUPPORT_DIR/User/globalStorage/state.vscdb"
+    STATE_DB="$WINDSURF_SUPPORT_DIR/User/globalStorage/state.vscdb"
     if [ -f "$STATE_DB" ] && command -v sqlite3 &>/dev/null; then
         # value 列存的是 JSON 字符串形式的值，需要把 UUID 用双引号包裹
         sqlite3 "$STATE_DB" <<SQLEOF 2>/dev/null
@@ -1504,7 +1504,7 @@ UPDATE ItemTable SET value = '"$NEW_INSTALL_ID"' WHERE key = 'storage.serviceMac
 SQLEOF
     fi
 
-    print_success "Devin ID 已自动重置（含 storage.json + state.vscdb 同步）"
+    print_success "Windsurf ID 已自动重置（含 storage.json + state.vscdb 同步）"
     echo -e "  installation_id: ${GREEN}$NEW_INSTALL_ID${NC}"
     echo -e "  machineid:       ${GREEN}$NEW_MACHINE_ID${NC}"
     echo -e "  telemetry.*:     ${GREEN}已同步到 storage.json 和 state.vscdb${NC}"
@@ -1515,7 +1515,7 @@ SQLEOF
 # 触发时机：菜单 1/2/3/18/20/21/23/24 任一清理类操作完成后
 # 默认行为：强制重置（用户要求，用于绕过限速、刷新会话、伪装新设备）
 # 逃生通道：执行前设置环境变量 FORCE_RESET_ID=0 即可完全跳过
-#   例：FORCE_RESET_ID=0 bash fix-devin-mac.sh
+#   例：FORCE_RESET_ID=0 bash fix-windsurf-mac.sh
 # ----------------------------------------------------------------------------
 auto_reset_after_clean() {
     # 用户主动关闭？
@@ -1530,32 +1530,32 @@ auto_reset_after_clean() {
     fi
 
     echo ""
-    echo -e "${CYAN}================ 清理后强制重置 Devin 设备 ID ================${NC}"
+    echo -e "${CYAN}================ 清理后强制重置 Windsurf 设备 ID ================${NC}"
     print_warning "此为用户默认行为：每次清理完成后自动重置设备标识"
-    print_warning "预期影响：Devin 服务端会识别为新设备，可能需要重新登录一次"
-    print_info   "如需关闭此行为：下次运行前加 FORCE_RESET_ID=0 bash fix-devin-mac.sh"
+    print_warning "预期影响：Windsurf 服务端会识别为新设备，可能需要重新登录一次"
+    print_info   "如需关闭此行为：下次运行前加 FORCE_RESET_ID=0 bash fix-windsurf-mac.sh"
     echo ""
 
-    # 关闭 Devin 才能可靠重置 storage.json
-    if pgrep -f "Devin" &>/dev/null; then
-        print_warning "检测到 Devin 正在运行，建议先关闭再重置，以免 storage.json 被覆盖"
+    # 关闭 Windsurf 才能可靠重置 storage.json
+    if pgrep -f "Windsurf" &>/dev/null; then
+        print_warning "检测到 Windsurf 正在运行，建议先关闭再重置，以免 storage.json 被覆盖"
         print_info "将等待 3 秒后继续（Ctrl+C 可取消）..."
         sleep 3
     fi
 
-    reset_devin_id_auto
+    reset_windsurf_id_auto
     echo -e "${CYAN}================================================================${NC}"
 }
 
-reset_devin_id() {
-    print_info "重置 Devin ID..."
+reset_windsurf_id() {
+    print_info "重置 Windsurf ID..."
     
-    INSTALLATION_ID_FILE="$DEVIN_DIR/installation_id"
-    MACHINE_ID_FILE="$DEVIN_SUPPORT_DIR/machineid"
-    STORAGE_JSON="$DEVIN_SUPPORT_DIR/User/globalStorage/storage.json"
+    INSTALLATION_ID_FILE="$WINDSURF_DIR/installation_id"
+    MACHINE_ID_FILE="$WINDSURF_SUPPORT_DIR/machineid"
+    STORAGE_JSON="$WINDSURF_SUPPORT_DIR/User/globalStorage/storage.json"
     
     echo ""
-    echo -e "${CYAN}当前 Devin ID 信息:${NC}"
+    echo -e "${CYAN}当前 Windsurf ID 信息:${NC}"
     echo ""
     
     # 显示当前 ID
@@ -1580,13 +1580,13 @@ reset_devin_id() {
     fi
     
     echo ""
-    print_warning "此操作将重新生成所有 Devin 标识 ID"
+    print_warning "此操作将重新生成所有 Windsurf 标识 ID"
     echo "  包括: installation_id, machineid, telemetry ID"
-    echo "  重置后 Devin 将被视为全新安装"
+    echo "  重置后 Windsurf 将被视为全新安装"
     echo ""
     
     if confirm_action; then
-        if ! check_devin_running; then
+        if ! check_windsurf_running; then
             return 1
         fi
         
@@ -1652,8 +1652,8 @@ PYEOF
         echo -e "  telemetry.machineId:    ${GREEN}$NEW_TELEMETRY_MACHINE_ID${NC}"
         echo -e "  telemetry.sqmId:        ${GREEN}$NEW_SQM_ID${NC}"
         echo ""
-        print_success "Devin ID 重置完成！"
-        print_info "请重启 Devin 使更改生效"
+        print_success "Windsurf ID 重置完成！"
+        print_info "请重启 Windsurf 使更改生效"
     else
         print_info "已取消操作"
     fi
@@ -1722,35 +1722,35 @@ deep_clean_runtime_cache() {
         print_info "已启用自动确认模式"
     fi
 
-    if ! check_devin_running; then
+    if ! check_windsurf_running; then
         return 1
     fi
     TOTAL_RELEASED_KB=0
 
     # ── Electron 内核缓存 ──────────────────────────────────────────────────
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/Cache/*"                          "清理浏览器缓存 (Cache)"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/CachedData/*"                     "清理编译缓存 (CachedData)"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/GPUCache/*"                       "清理 GPU 缓存 (GPUCache)"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/Code Cache/*"                     "清理代码缓存 (Code Cache)"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/DawnWebGPUCache/*"                "清理 Dawn WebGPU 缓存"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/DawnGraphiteCache/*"              "清理 Dawn Graphite 缓存"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/Shared Dictionary/*"              "清理 Shared Dictionary 缓存"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/Cache/*"                          "清理浏览器缓存 (Cache)"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/CachedData/*"                     "清理编译缓存 (CachedData)"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/GPUCache/*"                       "清理 GPU 缓存 (GPUCache)"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/Code Cache/*"                     "清理代码缓存 (Code Cache)"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/DawnWebGPUCache/*"                "清理 Dawn WebGPU 缓存"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/DawnGraphiteCache/*"              "清理 Dawn Graphite 缓存"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/Shared Dictionary/*"              "清理 Shared Dictionary 缓存"
 
     # ── 日志 / 崩溃报告 ───────────────────────────────────────────────────
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/logs/*"                           "清理日志文件 (logs)"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/Crashpad/completed/*"             "清理 Crashpad completed"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/Crashpad/pending/*"               "清理 Crashpad pending"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/logs/*"                           "清理日志文件 (logs)"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/Crashpad/completed/*"             "清理 Crashpad completed"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/Crashpad/pending/*"               "清理 Crashpad pending"
 
     # ── 工作区 / 历史 / 插件残留 ───────────────────────────────────────────
-    clean_file_with_stats "$DEVIN_SUPPORT_DIR/User/globalStorage/state.vscdb.backup" "清理 state.vscdb.backup（关键大文件）"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/User/workspaceStorage/*"          "清理工作区状态缓存 (workspaceStorage)"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/User/History/*"                   "清理本地文件历史 (History)"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/CachedExtensionVSIXs/*"           "清理旧版插件安装包残留"
+    clean_file_with_stats "$WINDSURF_SUPPORT_DIR/User/globalStorage/state.vscdb.backup" "清理 state.vscdb.backup（关键大文件）"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/User/workspaceStorage/*"          "清理工作区状态缓存 (workspaceStorage)"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/User/History/*"                   "清理本地文件历史 (History)"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/CachedExtensionVSIXs/*"           "清理旧版插件安装包残留"
 
     # ── 语言包缓存（clp 目录，保留最新版） ────────────────────────────────
     echo ""
     print_info "清理旧版语言包缓存 (clp)"
-    CLP_DIR="$DEVIN_SUPPORT_DIR/clp"
+    CLP_DIR="$WINDSURF_SUPPORT_DIR/clp"
     if [ -d "$CLP_DIR" ]; then
         BEFORE_KB=$(du -sk "$CLP_DIR" 2>/dev/null | awk '{print $1}')
         BEFORE_KB=${BEFORE_KB:-0}
@@ -1775,33 +1775,33 @@ deep_clean_runtime_cache() {
     fi
 
     # ── CachedProfilesData 缓存 ────────────────────────────────────────────
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/CachedProfilesData/*"             "清理配置文件缓存 (CachedProfilesData)"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/CachedProfilesData/*"             "清理配置文件缓存 (CachedProfilesData)"
 
     # ── AI 索引缓存 ────────────────────────────────────────────────────────
     clean_glob_with_stats "$IMPLICIT_DIR/*"                                        "清理 implicit AI 索引缓存"
     clean_glob_with_stats "$CODE_TRACKER_DIR/*"                                    "清理 AI 代码追踪索引 (code_tracker)"
 
     # ── macOS 系统级缓存 ───────────────────────────────────────────────────
-    clean_glob_with_stats "$MACOS_WS_CACHE/*"                                      "清理 macOS Devin 系统缓存"
-    clean_glob_with_stats "$MACOS_WS_SHIPIT/*"                                     "清理 macOS Devin ShipIt 缓存"
+    clean_glob_with_stats "$MACOS_WS_CACHE/*"                                      "清理 macOS Windsurf 系统缓存"
+    clean_glob_with_stats "$MACOS_WS_SHIPIT/*"                                     "清理 macOS Windsurf ShipIt 缓存"
 
     # ── 临时文件 ──────────────────────────────────────────────────────────
-    clean_glob_with_stats "/tmp/devin-terminal-*.snapshot"                      "清理 /tmp 终端快照"
+    clean_glob_with_stats "/tmp/windsurf-terminal-*.snapshot"                      "清理 /tmp 终端快照"
     clean_glob_with_stats "$HOME/.zcompdump*"                                       "清理 Zsh 自动补全缓存（解决终端卡顿）"
 
     # ── IndexedDB / Service Worker / blob_storage 安全清理 ────────────────
     # 重要说明：
-    #   1. IndexedDB 在 Devin 中存的是 VSCode webview 的 UI 状态（Cascade 面板滚动/折叠、编辑器 Tab 状态），
+    #   1. IndexedDB 在 Windsurf 中存的是 VSCode webview 的 UI 状态（Cascade 面板滚动/折叠、编辑器 Tab 状态），
     #      不是登录凭证。登录凭证位于 Cookies/Local Storage/WebStorage 以及 ~/.codeium/windsurf/installation_id。
-    #      清理 IndexedDB 后重启 Devin 仍保持登录，只会重置 Cascade 面板的 UI 排版。
+    #      清理 IndexedDB 后重启 Windsurf 仍保持登录，只会重置 Cascade 面板的 UI 排版。
     #   2. Service Worker/CacheStorage 与 ScriptCache 是 Chromium Service Worker 的静态资源缓存，
     #      与登录态无关，清理后会在下一次启动自动重建。
     #   3. blob_storage 是临时 blob 对象缓存，与登录无关。
     #   4. 对话历史存于 ~/.codeium/windsurf/cascade/*.pb，与以上目录完全独立。
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/IndexedDB/*"                      "清理 IndexedDB（Cascade UI 状态，不影响登录和对话）"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/Service Worker/CacheStorage/*"    "清理 Service Worker CacheStorage（静态资源缓存）"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/Service Worker/ScriptCache/*"     "清理 Service Worker ScriptCache（脚本缓存）"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/blob_storage/*"                   "清理 blob_storage（临时 Blob 对象缓存）"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/IndexedDB/*"                      "清理 IndexedDB（Cascade UI 状态，不影响登录和对话）"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/Service Worker/CacheStorage/*"    "清理 Service Worker CacheStorage（静态资源缓存）"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/Service Worker/ScriptCache/*"     "清理 Service Worker ScriptCache（脚本缓存）"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/blob_storage/*"                   "清理 blob_storage（临时 Blob 对象缓存）"
 
     # ── state.vscdb VACUUM 优化（不删除文件，仅压缩 SQLite 数据库碎片） ──────
     # 根因：Cascade 面板的快速操作会持续写入 state.vscdb，如果不 VACUUM，
@@ -1809,7 +1809,7 @@ deep_clean_runtime_cache() {
     #       这是对话长后切换/启动变慢的主因之一。
     echo ""
     print_info "VACUUM 全局 state.vscdb 数据库（保留全部数据，只压缩碎片）..."
-    STATE_DB="$DEVIN_SUPPORT_DIR/User/globalStorage/state.vscdb"
+    STATE_DB="$WINDSURF_SUPPORT_DIR/User/globalStorage/state.vscdb"
     if [ -f "$STATE_DB" ]; then
         BEFORE_KB=$(du -sk "$STATE_DB" 2>/dev/null | awk '{print $1}')
         BEFORE_KB=${BEFORE_KB:-0}
@@ -1817,7 +1817,7 @@ deep_clean_runtime_cache() {
         if command -v sqlite3 &> /dev/null; then
             sqlite3 "$STATE_DB" "VACUUM;" 2>/dev/null && \
                 print_success "  全局 VACUUM 完成" || \
-                print_warning "  全局 VACUUM 失败（文件可能被占用，请先关闭 Devin）"
+                print_warning "  全局 VACUUM 失败（文件可能被占用，请先关闭 Windsurf）"
             AFTER_KB=$(du -sk "$STATE_DB" 2>/dev/null | awk '{print $1}')
             AFTER_KB=${AFTER_KB:-0}
             RELEASED_KB=$((BEFORE_KB - AFTER_KB))
@@ -1839,7 +1839,7 @@ deep_clean_runtime_cache() {
     if command -v sqlite3 &> /dev/null; then
         WS_VACUUM_COUNT=0
         WS_VACUUM_RELEASED_KB=0
-        WORKSPACE_STORAGE_DIR="$DEVIN_SUPPORT_DIR/User/workspaceStorage"
+        WORKSPACE_STORAGE_DIR="$WINDSURF_SUPPORT_DIR/User/workspaceStorage"
         if [ -d "$WORKSPACE_STORAGE_DIR" ]; then
             while IFS= read -r ws_db; do
                 if [ -f "$ws_db" ]; then
@@ -1867,20 +1867,20 @@ deep_clean_runtime_cache() {
     # ── 登录态高风险存储（默认保留，不在第一阶段清理） ─────────────────────
     # 真正的登录相关存储：Cookies、Local Storage、WebStorage、Session Storage、
     # Network Persistent State、TransportSecurity、DIPS、SharedStorage、Trust Tokens
-    WEBSTORAGE_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/WebStorage")
-    LOCAL_STORAGE_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/Local Storage")
-    SESSION_STORAGE_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/Session Storage")
-    COOKIES_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/Cookies")
-    NETWORK_STATE_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/Network Persistent State")
-    DIPS_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/DIPS")
-    SHARED_STORAGE_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/SharedStorage")
-    TRUST_TOKENS_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/Trust Tokens")
+    WEBSTORAGE_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/WebStorage")
+    LOCAL_STORAGE_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/Local Storage")
+    SESSION_STORAGE_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/Session Storage")
+    COOKIES_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/Cookies")
+    NETWORK_STATE_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/Network Persistent State")
+    DIPS_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/DIPS")
+    SHARED_STORAGE_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/SharedStorage")
+    TRUST_TOKENS_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/Trust Tokens")
     RISKY_TOTAL_KB=$((WEBSTORAGE_KB + LOCAL_STORAGE_KB + SESSION_STORAGE_KB + COOKIES_KB + NETWORK_STATE_KB + DIPS_KB + SHARED_STORAGE_KB + TRUST_TOKENS_KB))
 
     if [ "$AUTO_CONFIRM" != "--auto" ] && [ "$RISKY_TOTAL_KB" -gt 0 ] 2>/dev/null; then
         echo ""
         print_warning "默认已保留 $(format_kb_size "$RISKY_TOTAL_KB") 的登录态相关存储"
-        echo -e "  ${CYAN}[仅供参考] 如需彻底清理（会强制重新登录 Devin）才选 y:${NC}"
+        echo -e "  ${CYAN}[仅供参考] 如需彻底清理（会强制重新登录 Windsurf）才选 y:${NC}"
         [ "$COOKIES_KB" -gt 0 ]        && echo "    Cookies -> $(format_kb_size "$COOKIES_KB")"
         [ "$LOCAL_STORAGE_KB" -gt 0 ]  && echo "    Local Storage -> $(format_kb_size "$LOCAL_STORAGE_KB")"
         [ "$WEBSTORAGE_KB" -gt 0 ]     && echo "    WebStorage -> $(format_kb_size "$WEBSTORAGE_KB")"
@@ -1889,23 +1889,23 @@ deep_clean_runtime_cache() {
         [ "$DIPS_KB" -gt 0 ]           && echo "    DIPS -> $(format_kb_size "$DIPS_KB")"
         [ "$SHARED_STORAGE_KB" -gt 0 ] && echo "    SharedStorage -> $(format_kb_size "$SHARED_STORAGE_KB")"
         [ "$TRUST_TOKENS_KB" -gt 0 ]   && echo "    Trust Tokens -> $(format_kb_size "$TRUST_TOKENS_KB")"
-        echo -ne ${YELLOW}是否继续清理登录态相关存储？这会强制重新登录 Devin [y/N]: ${NC}
+        echo -ne ${YELLOW}是否继续清理登录态相关存储？这会强制重新登录 Windsurf [y/N]: ${NC}
         read -r choice
         case "$choice" in
             y|Y )
-                clean_glob_with_stats "$DEVIN_SUPPORT_DIR/WebStorage/*"             "清理 WebStorage（内嵌网页登录态）"
-                clean_glob_with_stats "$DEVIN_SUPPORT_DIR/Local Storage/*"          "清理 Local Storage（会话数据）"
-                clean_glob_with_stats "$DEVIN_SUPPORT_DIR/Session Storage/*"        "清理 Session Storage"
-                clean_file_with_stats "$DEVIN_SUPPORT_DIR/Cookies"                  "清理 Cookies（登录 Cookie）"
-                clean_file_with_stats "$DEVIN_SUPPORT_DIR/Cookies-journal"          "清理 Cookies-journal"
-                clean_file_with_stats "$DEVIN_SUPPORT_DIR/Network Persistent State" "清理 Network Persistent State"
-                clean_file_with_stats "$DEVIN_SUPPORT_DIR/TransportSecurity"        "清理 TransportSecurity"
-                clean_file_with_stats "$DEVIN_SUPPORT_DIR/DIPS"                     "清理 DIPS"
-                clean_file_with_stats "$DEVIN_SUPPORT_DIR/DIPS-wal"                 "清理 DIPS-wal"
-                clean_file_with_stats "$DEVIN_SUPPORT_DIR/SharedStorage"            "清理 SharedStorage"
-                clean_file_with_stats "$DEVIN_SUPPORT_DIR/SharedStorage-wal"        "清理 SharedStorage-wal"
-                clean_file_with_stats "$DEVIN_SUPPORT_DIR/Trust Tokens"             "清理 Trust Tokens"
-                clean_file_with_stats "$DEVIN_SUPPORT_DIR/Trust Tokens-journal"     "清理 Trust Tokens-journal"
+                clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/WebStorage/*"             "清理 WebStorage（内嵌网页登录态）"
+                clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/Local Storage/*"          "清理 Local Storage（会话数据）"
+                clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/Session Storage/*"        "清理 Session Storage"
+                clean_file_with_stats "$WINDSURF_SUPPORT_DIR/Cookies"                  "清理 Cookies（登录 Cookie）"
+                clean_file_with_stats "$WINDSURF_SUPPORT_DIR/Cookies-journal"          "清理 Cookies-journal"
+                clean_file_with_stats "$WINDSURF_SUPPORT_DIR/Network Persistent State" "清理 Network Persistent State"
+                clean_file_with_stats "$WINDSURF_SUPPORT_DIR/TransportSecurity"        "清理 TransportSecurity"
+                clean_file_with_stats "$WINDSURF_SUPPORT_DIR/DIPS"                     "清理 DIPS"
+                clean_file_with_stats "$WINDSURF_SUPPORT_DIR/DIPS-wal"                 "清理 DIPS-wal"
+                clean_file_with_stats "$WINDSURF_SUPPORT_DIR/SharedStorage"            "清理 SharedStorage"
+                clean_file_with_stats "$WINDSURF_SUPPORT_DIR/SharedStorage-wal"        "清理 SharedStorage-wal"
+                clean_file_with_stats "$WINDSURF_SUPPORT_DIR/Trust Tokens"             "清理 Trust Tokens"
+                clean_file_with_stats "$WINDSURF_SUPPORT_DIR/Trust Tokens-journal"     "清理 Trust Tokens-journal"
                 ;;
             * )
                 print_info "已保留登录态相关存储（推荐）"
@@ -1922,14 +1922,14 @@ deep_clean_runtime_cache() {
 }
 
 # ----------------------------------------------------------------------------
-# 功能19: Devin 进程资源监控
+# 功能19: Windsurf 进程资源监控
 # ----------------------------------------------------------------------------
-monitor_devin_processes() {
-    print_info "Devin 进程资源监控..."
+monitor_windsurf_processes() {
+    print_info "Windsurf 进程资源监控..."
     
     echo ""
-    echo -e "${CYAN}========== Devin 进程 ==========${NC}"
-    PROCESS_OUTPUT=$(ps aux | grep -i "[w]indsurf" | grep -v "fix-devin-mac.sh")
+    echo -e "${CYAN}========== Windsurf 进程 ==========${NC}"
+    PROCESS_OUTPUT=$(ps aux | grep -i "[w]indsurf" | grep -v "fix-windsurf-mac.sh")
     
     if [ -n "$PROCESS_OUTPUT" ]; then
         printf "%-8s %-8s %-8s %s\n" "PID" "CPU%" "MEM%" "命令"
@@ -1939,7 +1939,7 @@ monitor_devin_processes() {
             printf "%-8s %-8s %-8s %s\n", $2, $3, $4, cmd
         }'
     else
-        print_warning "未检测到 Devin 正在运行"
+        print_warning "未检测到 Windsurf 正在运行"
     fi
     
     echo ""
@@ -2003,7 +2003,7 @@ smart_optimize() {
 # ----------------------------------------------------------------------------
 # 功能23: Cascade 对话历史归档（保留对话但解决"对话长卡顿"）
 # 说明：
-#   Devin 的 Cascade 启动时会尝试加载 ~/.codeium/windsurf/cascade/*.pb，
+#   Windsurf 的 Cascade 启动时会尝试加载 ~/.codeium/windsurf/cascade/*.pb，
 #   当这些文件累计到几百 MB（单文件可达 27MB 以上）时，切换/启动会明显变卡。
 #   本功能把"超过 N 天"或"超过 M MB"的旧对话 *移动*（不是删除）到归档目录，
 #   减小运行时加载量。需要时可以随时把归档文件拷回原目录恢复访问。
@@ -2128,7 +2128,7 @@ archive_old_conversations() {
     echo ""
 
     ARCHIVE_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-    ARCHIVE_TARGET="$HOME/.devin-conversations-archive-$ARCHIVE_TIMESTAMP"
+    ARCHIVE_TARGET="$HOME/.windsurf-conversations-archive-$ARCHIVE_TIMESTAMP"
     echo -e "归档目标目录: ${CYAN}$ARCHIVE_TARGET${NC}"
     echo -e "${GREEN}注意：这是移动操作（不是删除），随时可以拷回 $CASCADE_PB_DIR 恢复。${NC}"
     echo ""
@@ -2138,7 +2138,7 @@ archive_old_conversations() {
         return 0
     fi
 
-    if ! check_devin_running; then
+    if ! check_windsurf_running; then
         return 1
     fi
 
@@ -2153,20 +2153,20 @@ archive_old_conversations() {
     # 生成恢复脚本，方便用户一键恢复
     cat > "$ARCHIVE_TARGET/restore.sh" << RESTORE_EOF
 #!/bin/bash
-# 一键恢复本次归档的所有对话到 Devin。
+# 一键恢复本次归档的所有对话到 Windsurf。
 # 使用方法： bash restore.sh
 set -e
 TARGET="\$HOME/.codeium/windsurf/cascade"
 mkdir -p "\$TARGET"
 cp -n "\$(dirname "\$0")"/*.pb "\$TARGET/"
-echo "已恢复到 \$TARGET，请重启 Devin。"
+echo "已恢复到 \$TARGET，请重启 Windsurf。"
 RESTORE_EOF
     chmod +x "$ARCHIVE_TARGET/restore.sh" 2>/dev/null || true
 
     # 生成归档信息
     cat > "$ARCHIVE_TARGET/archive_info.txt" << AEOF
 ========================================
-Devin Cascade 对话归档
+Windsurf Cascade 对话归档
 ========================================
 归档时间: $(date)
 归档来源: $CASCADE_PB_DIR
@@ -2178,7 +2178,7 @@ Devin Cascade 对话归档
   1. 直接运行脚本：  bash "$ARCHIVE_TARGET/restore.sh"
   2. 手动复制文件：  cp "$ARCHIVE_TARGET"/*.pb "$CASCADE_PB_DIR/"
   3. 只恢复某一个：  cp "$ARCHIVE_TARGET/<file>.pb" "$CASCADE_PB_DIR/"
-恢复后重启 Devin 即可再次看到这些对话。
+恢复后重启 Windsurf 即可再次看到这些对话。
 ========================================
 AEOF
 
@@ -2190,7 +2190,7 @@ AEOF
     echo ""
     print_success "已归档 $MOVED_COUNT 个对话到 $ARCHIVE_TARGET"
     print_success "Cascade 目录从 $(format_kb_size "$TOTAL_PB_KB") 缩减到 $(format_kb_size "$AFTER_PB_KB")（释放 $(format_kb_size "$RELEASED_KB")）"
-    print_info "Devin 重启后加载更快。想恢复任何对话：bash \"$ARCHIVE_TARGET/restore.sh\""
+    print_info "Windsurf 重启后加载更快。想恢复任何对话：bash \"$ARCHIVE_TARGET/restore.sh\""
 
     # 归档完毕 -> 强制重置设备 ID（默认行为）
     if [ "$MOVED_COUNT" -gt 0 ] 2>/dev/null; then
@@ -2218,22 +2218,22 @@ quick_diagnose_and_fix() {
     CASCADE_TOTAL_KB=${CASCADE_TOTAL_KB:-0}
     CASCADE_COUNT=$(find "$CASCADE_DIR" -maxdepth 1 -name "*.pb" -type f 2>/dev/null | wc -l | tr -d ' ')
 
-    STATE_DB_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/User/globalStorage/state.vscdb")
-    STATE_DB_BACKUP_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/User/globalStorage/state.vscdb.backup")
-    WS_STORAGE_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/User/workspaceStorage")
-    WS_COUNT=$(find "$DEVIN_SUPPORT_DIR/User/workspaceStorage" -maxdepth 2 -name "state.vscdb" -type f 2>/dev/null | wc -l | tr -d ' ')
+    STATE_DB_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/User/globalStorage/state.vscdb")
+    STATE_DB_BACKUP_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/User/globalStorage/state.vscdb.backup")
+    WS_STORAGE_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/User/workspaceStorage")
+    WS_COUNT=$(find "$WINDSURF_SUPPORT_DIR/User/workspaceStorage" -maxdepth 2 -name "state.vscdb" -type f 2>/dev/null | wc -l | tr -d ' ')
 
-    CACHE_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/Cache")
-    CACHED_DATA_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/CachedData")
-    GPUCACHE_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/GPUCache")
-    CODECACHE_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/Code Cache")
-    INDEXEDDB_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/IndexedDB")
-    SW_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/Service Worker")
-    LOGS_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/logs")
-    CRASHPAD_KB=$(calculate_path_size_kb "$DEVIN_SUPPORT_DIR/Crashpad")
+    CACHE_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/Cache")
+    CACHED_DATA_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/CachedData")
+    GPUCACHE_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/GPUCache")
+    CODECACHE_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/Code Cache")
+    INDEXEDDB_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/IndexedDB")
+    SW_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/Service Worker")
+    LOGS_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/logs")
+    CRASHPAD_KB=$(calculate_path_size_kb "$WINDSURF_SUPPORT_DIR/Crashpad")
     IMPLICIT_KB=$(calculate_path_size_kb "$IMPLICIT_DIR")
     CODE_TRACKER_KB=$(calculate_path_size_kb "$CODE_TRACKER_DIR")
-    TERM_SNAP_COUNT=$(ls /tmp/devin-terminal-*.snapshot 2>/dev/null | wc -l | tr -d ' ')
+    TERM_SNAP_COUNT=$(ls /tmp/windsurf-terminal-*.snapshot 2>/dev/null | wc -l | tr -d ' ')
 
     echo -e "  ${CYAN}[对话历史]${NC}         cascade/ -> $(format_kb_size "$CASCADE_TOTAL_KB") ($CASCADE_COUNT 个对话，保留)"
     echo -e "  ${CYAN}[数据库]${NC}           state.vscdb -> $(format_kb_size "$STATE_DB_KB")（VACUUM 可压缩）"
@@ -2243,14 +2243,14 @@ quick_diagnose_and_fix() {
     echo -e "  ${CYAN}[UI 状态]${NC}          IndexedDB=$(format_kb_size "$INDEXEDDB_KB") / Service Worker=$(format_kb_size "$SW_KB")"
     echo -e "  ${CYAN}[日志/崩溃]${NC}        logs=$(format_kb_size "$LOGS_KB") / Crashpad=$(format_kb_size "$CRASHPAD_KB")"
     echo -e "  ${CYAN}[AI 索引]${NC}          implicit=$(format_kb_size "$IMPLICIT_KB") / code_tracker=$(format_kb_size "$CODE_TRACKER_KB")"
-    echo -e "  ${CYAN}[终端快照]${NC}         /tmp/devin-terminal-*.snapshot 数量: $TERM_SNAP_COUNT"
+    echo -e "  ${CYAN}[终端快照]${NC}         /tmp/windsurf-terminal-*.snapshot 数量: $TERM_SNAP_COUNT"
 
     # 计算一键优化释放的总量
     QUICK_TOTAL_KB=$((STATE_DB_BACKUP_KB + CACHE_KB + CACHED_DATA_KB + GPUCACHE_KB + CODECACHE_KB + INDEXEDDB_KB + SW_KB + LOGS_KB + CRASHPAD_KB + IMPLICIT_KB + CODE_TRACKER_KB))
 
     echo ""
     echo -e "${CYAN}========== 建议操作（一键执行将释放 ~$(format_kb_size "$QUICK_TOTAL_KB") + VACUUM 瘦身）==========${NC}"
-    echo "  1. 关闭 Devin（必需，否则数据库被锁）"
+    echo "  1. 关闭 Windsurf（必需，否则数据库被锁）"
     echo "  2. VACUUM 全局 state.vscdb 和所有工作区 state.vscdb（压缩不删数据）"
     echo "  3. 清理 Cache / CachedData / GPUCache / Code Cache（Electron 内核缓存）"
     echo "  4. 清理 IndexedDB / Service Worker 缓存（Cascade UI 状态，不影响登录）"
@@ -2263,7 +2263,7 @@ quick_diagnose_and_fix() {
 
     if [ "$CASCADE_TOTAL_KB" -gt 204800 ] 2>/dev/null; then
         echo -e "${YELLOW}[提示] 你的对话历史已超过 200MB，${NC}"
-        echo -e "${YELLOW}       即便做完上面的优化，Devin 加载仍可能偏慢。${NC}"
+        echo -e "${YELLOW}       即便做完上面的优化，Windsurf 加载仍可能偏慢。${NC}"
         echo -e "${YELLOW}       建议再执行菜单 23 做对话归档（移动不删除）。${NC}"
         echo ""
     fi
@@ -2275,7 +2275,7 @@ quick_diagnose_and_fix() {
         * ) print_info "已取消操作"; return 0 ;;
     esac
 
-    if ! check_devin_running; then
+    if ! check_windsurf_running; then
         return 1
     fi
 
@@ -2283,49 +2283,49 @@ quick_diagnose_and_fix() {
     TOTAL_RELEASED_KB=0
 
     # Electron 内核缓存
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/Cache/*"                          "清理 Electron Cache"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/CachedData/*"                     "清理 CachedData"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/GPUCache/*"                       "清理 GPUCache"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/Code Cache/*"                     "清理 Code Cache"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/DawnWebGPUCache/*"                "清理 DawnWebGPUCache"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/DawnGraphiteCache/*"              "清理 DawnGraphiteCache"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/Shared Dictionary/*"              "清理 Shared Dictionary"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/Cache/*"                          "清理 Electron Cache"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/CachedData/*"                     "清理 CachedData"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/GPUCache/*"                       "清理 GPUCache"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/Code Cache/*"                     "清理 Code Cache"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/DawnWebGPUCache/*"                "清理 DawnWebGPUCache"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/DawnGraphiteCache/*"              "清理 DawnGraphiteCache"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/Shared Dictionary/*"              "清理 Shared Dictionary"
 
     # UI / 脚本缓存（不影响登录）
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/IndexedDB/*"                      "清理 IndexedDB（Cascade UI 状态）"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/Service Worker/CacheStorage/*"    "清理 Service Worker CacheStorage"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/Service Worker/ScriptCache/*"     "清理 Service Worker ScriptCache"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/blob_storage/*"                   "清理 blob_storage"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/IndexedDB/*"                      "清理 IndexedDB（Cascade UI 状态）"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/Service Worker/CacheStorage/*"    "清理 Service Worker CacheStorage"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/Service Worker/ScriptCache/*"     "清理 Service Worker ScriptCache"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/blob_storage/*"                   "清理 blob_storage"
 
     # 日志 / 崩溃报告
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/logs/*"                           "清理 logs"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/Crashpad/completed/*"             "清理 Crashpad completed"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/Crashpad/pending/*"               "清理 Crashpad pending"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/logs/*"                           "清理 logs"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/Crashpad/completed/*"             "清理 Crashpad completed"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/Crashpad/pending/*"               "清理 Crashpad pending"
 
     # AI 索引缓存（重建）
     clean_glob_with_stats "$IMPLICIT_DIR/*"                                        "清理 implicit AI 索引缓存"
     clean_glob_with_stats "$CODE_TRACKER_DIR/*"                                    "清理 code_tracker AI 索引"
 
     # 扩展和 profile 缓存
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/CachedExtensionVSIXs/*"           "清理旧扩展安装包"
-    clean_glob_with_stats "$DEVIN_SUPPORT_DIR/CachedProfilesData/*"             "清理配置缓存"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/CachedExtensionVSIXs/*"           "清理旧扩展安装包"
+    clean_glob_with_stats "$WINDSURF_SUPPORT_DIR/CachedProfilesData/*"             "清理配置缓存"
 
     # 数据库备份（可重建，不是对话历史）
-    clean_file_with_stats "$DEVIN_SUPPORT_DIR/User/globalStorage/state.vscdb.backup" "清理 state.vscdb.backup（不是对话，是旧备份）"
+    clean_file_with_stats "$WINDSURF_SUPPORT_DIR/User/globalStorage/state.vscdb.backup" "清理 state.vscdb.backup（不是对话，是旧备份）"
 
     # 临时文件
-    clean_glob_with_stats "/tmp/devin-terminal-*.snapshot"                      "清理 /tmp 终端快照"
+    clean_glob_with_stats "/tmp/windsurf-terminal-*.snapshot"                      "清理 /tmp 终端快照"
     clean_glob_with_stats "$HOME/.zcompdump*"                                       "清理 Zsh 自动补全缓存"
 
-    # macOS 系统级 Devin 缓存
-    clean_glob_with_stats "$MACOS_WS_CACHE/*"                                      "清理 macOS Devin 系统缓存"
-    clean_glob_with_stats "$MACOS_WS_SHIPIT/*"                                     "清理 macOS Devin ShipIt 缓存"
+    # macOS 系统级 Windsurf 缓存
+    clean_glob_with_stats "$MACOS_WS_CACHE/*"                                      "清理 macOS Windsurf 系统缓存"
+    clean_glob_with_stats "$MACOS_WS_SHIPIT/*"                                     "清理 macOS Windsurf ShipIt 缓存"
 
     # VACUUM 所有 SQLite 数据库（核心优化！）
     if command -v sqlite3 &> /dev/null; then
         echo ""
         print_info "VACUUM 全局 state.vscdb（保留数据，只压缩碎片）"
-        STATE_DB_FILE="$DEVIN_SUPPORT_DIR/User/globalStorage/state.vscdb"
+        STATE_DB_FILE="$WINDSURF_SUPPORT_DIR/User/globalStorage/state.vscdb"
         if [ -f "$STATE_DB_FILE" ]; then
             B_KB=$(du -sk "$STATE_DB_FILE" 2>/dev/null | awk '{print $1+0}')
             sqlite3 "$STATE_DB_FILE" "VACUUM;" 2>/dev/null && {
@@ -2340,7 +2340,7 @@ quick_diagnose_and_fix() {
         echo ""
         print_info "VACUUM 所有工作区 state.vscdb（保留工作区状态）"
         WS_N=0; WS_REL=0
-        WORKSPACE_STORAGE_DIR="$DEVIN_SUPPORT_DIR/User/workspaceStorage"
+        WORKSPACE_STORAGE_DIR="$WINDSURF_SUPPORT_DIR/User/workspaceStorage"
         if [ -d "$WORKSPACE_STORAGE_DIR" ]; then
             while IFS= read -r wsdb; do
                 [ -z "$wsdb" ] && continue
@@ -2373,7 +2373,7 @@ quick_diagnose_and_fix() {
 
     # 卡顿优化完毕 -> 强制重置设备 ID（默认行为）
     auto_reset_after_clean
-    print_info "请现在重新启动 Devin（若被要求重新登录，用原来的账户登即可）"
+    print_info "请现在重新启动 Windsurf（若被要求重新登录，用原来的账户登即可）"
 }
 
 # ----------------------------------------------------------------------------
@@ -2382,12 +2382,12 @@ quick_diagnose_and_fix() {
 enable_legacy_terminal() {
     print_info "启用 Legacy 终端配置..."
     
-    SETTINGS_JSON="$HOME/Library/Application Support/Devin/User/settings.json"
+    SETTINGS_JSON="$HOME/Library/Application Support/Windsurf/User/settings.json"
     
     echo ""
     echo "如果专用终端有问题，可以启用 Legacy Terminal Profile"
     echo ""
-    echo "请在 Devin 设置中搜索 'Legacy Terminal Profile' 并启用"
+    echo "请在 Windsurf 设置中搜索 'Legacy Terminal Profile' 并启用"
     echo "或手动编辑 settings.json 添加相关配置"
     echo ""
     print_info "settings.json 位置: $SETTINGS_JSON"
@@ -2399,7 +2399,7 @@ enable_legacy_terminal() {
 diagnose_mcp() {
     print_info "MCP (Model Context Protocol) 诊断..."
     
-    MCP_CONFIG="$DEVIN_DIR/mcp_config.json"
+    MCP_CONFIG="$WINDSURF_DIR/mcp_config.json"
     MCP_CONFIG_OLD="$CODEIUM_DIR/mcp_config.json"
     
     echo ""
@@ -2471,11 +2471,11 @@ diagnose_mcp() {
     echo ""
     echo -e "${CYAN}MCP 无法自动加载的常见解决方案:${NC}"
     echo ""
-    echo "  1. 在 Devin 中点击 MCPs 图标，手动刷新"
+    echo "  1. 在 Windsurf 中点击 MCPs 图标，手动刷新"
     echo "  2. 检查 mcp_config.json 格式是否正确"
     echo "  3. 确保所需的运行时（Node.js/Python）已安装"
     echo "  4. 检查环境变量（如 API keys）是否正确配置"
-    echo "  5. 查看 Devin 输出日志检查错误信息"
+    echo "  5. 查看 Windsurf 输出日志检查错误信息"
     echo ""
 }
 
@@ -2499,7 +2499,7 @@ clean_startup_cache() {
     echo ""
     
     if confirm_action; then
-        if ! check_devin_running; then
+        if ! check_windsurf_running; then
             return 1
         fi
         
@@ -2507,20 +2507,20 @@ clean_startup_cache() {
         mkdir -p "$BACKUP_DIR"
         
         # 清理 GPU 缓存
-        CACHE_DIR="$DEVIN_RUNTIME_DIR/Cache"
+        CACHE_DIR="$WINDSURF_RUNTIME_DIR/Cache"
         if [ -d "$CACHE_DIR" ]; then
             rm -rf "$CACHE_DIR"
             print_success "已清理 Cache"
         fi
 
-        GPU_CACHE="$DEVIN_RUNTIME_DIR/GPUCache"
+        GPU_CACHE="$WINDSURF_RUNTIME_DIR/GPUCache"
         if [ -d "$GPU_CACHE" ]; then
             rm -rf "$GPU_CACHE"
             print_success "已清理 GPUCache"
         fi
         
         # 清理 CachedData
-        for cache_dir in "$DEVIN_RUNTIME_DIR/CachedData" "$DEVIN_DIR/CachedData"; do
+        for cache_dir in "$WINDSURF_RUNTIME_DIR/CachedData" "$WINDSURF_DIR/CachedData"; do
             if [ -d "$cache_dir" ]; then
                 rm -rf "$cache_dir"
                 print_success "已清理 $(basename "$cache_dir")"
@@ -2528,7 +2528,7 @@ clean_startup_cache() {
         done
 
         # 清理扩展安装包缓存，兼容旧版目录结构。
-        for cache_dir in "$DEVIN_RUNTIME_DIR/CachedExtensionVSIXs" "$DEVIN_DIR/CachedExtensions"; do
+        for cache_dir in "$WINDSURF_RUNTIME_DIR/CachedExtensionVSIXs" "$WINDSURF_DIR/CachedExtensions"; do
             if [ -d "$cache_dir" ]; then
                 rm -rf "$cache_dir"
                 print_success "已清理 $(basename "$cache_dir")"
@@ -2536,13 +2536,13 @@ clean_startup_cache() {
         done
         
         # 清理 Code Cache
-        CODE_CACHE="$DEVIN_RUNTIME_DIR/Code Cache"
+        CODE_CACHE="$WINDSURF_RUNTIME_DIR/Code Cache"
         if [ -d "$CODE_CACHE" ]; then
             rm -rf "$CODE_CACHE"
             print_success "已清理 Code Cache"
         fi
 
-        for cache_dir in "$DEVIN_RUNTIME_DIR/DawnWebGPUCache" "$DEVIN_RUNTIME_DIR/DawnGraphiteCache"; do
+        for cache_dir in "$WINDSURF_RUNTIME_DIR/DawnWebGPUCache" "$WINDSURF_RUNTIME_DIR/DawnGraphiteCache"; do
             if [ -d "$cache_dir" ]; then
                 rm -rf "$cache_dir"
                 print_success "已清理 $(basename "$cache_dir")"
@@ -2550,7 +2550,7 @@ clean_startup_cache() {
         done
         
         # 清理 logs
-        LOGS_DIR="$DEVIN_RUNTIME_DIR/logs"
+        LOGS_DIR="$WINDSURF_RUNTIME_DIR/logs"
         if [ -d "$LOGS_DIR" ]; then
             # 只清理超过7天的日志
             find "$LOGS_DIR" -type f -mtime +7 -delete 2>/dev/null
@@ -2559,7 +2559,7 @@ clean_startup_cache() {
         
         echo ""
         print_success "启动缓存清理完成！"
-        print_info "重启 Devin 后启动速度应该会改善"
+        print_info "重启 Windsurf 后启动速度应该会改善"
 
         # 清理完毕 -> 强制重置设备 ID（默认行为）
         auto_reset_after_clean
@@ -2574,7 +2574,7 @@ clean_startup_cache() {
 reset_mcp_config() {
     print_info "重置 MCP 配置..."
     
-    MCP_CONFIG="$DEVIN_DIR/mcp_config.json"
+    MCP_CONFIG="$WINDSURF_DIR/mcp_config.json"
     
     echo ""
     print_warning "此操作将备份并重置 MCP 配置文件"
@@ -2599,7 +2599,7 @@ reset_mcp_config() {
 }
 EOF
         print_success "MCP 配置已重置"
-        print_info "请在 Devin 中重新添加 MCP 服务器"
+        print_info "请在 Windsurf 中重新添加 MCP 服务器"
     else
         print_info "已取消操作"
     fi
@@ -3007,10 +3007,10 @@ clean_system_caches() {
         TOTAL_SIZE=$((TOTAL_SIZE + SIZE))
     fi
     
-    # Devin 旧备份目录
+    # Windsurf 旧备份目录
     BACKUP_COUNT=0
     BACKUP_SIZE=0
-    for bdir in "$HOME"/.devin-backup-*; do
+    for bdir in "$HOME"/.windsurf-backup-*; do
         if [ -d "$bdir" ]; then
             BACKUP_COUNT=$((BACKUP_COUNT + 1))
             SIZE=$(du -sm "$bdir" 2>/dev/null | awk '{print $1}')
@@ -3018,12 +3018,12 @@ clean_system_caches() {
         fi
     done
     if [ $BACKUP_COUNT -gt 0 ]; then
-        echo -e "  ${GREEN}[Devin 旧备份]${NC} ${BACKUP_COUNT}个备份目录 - ${YELLOW}${BACKUP_SIZE}MB${NC}"
+        echo -e "  ${GREEN}[Windsurf 旧备份]${NC} ${BACKUP_COUNT}个备份目录 - ${YELLOW}${BACKUP_SIZE}MB${NC}"
         TOTAL_SIZE=$((TOTAL_SIZE + BACKUP_SIZE))
     fi
     
     # 旧诊断报告
-    DIAG_COUNT=$(ls "$HOME"/devin-diagnostic-*.txt 2>/dev/null | wc -l | tr -d ' ')
+    DIAG_COUNT=$(ls "$HOME"/windsurf-diagnostic-*.txt 2>/dev/null | wc -l | tr -d ' ')
     if [ "$DIAG_COUNT" -gt 0 ] 2>/dev/null; then
         echo -e "  ${GREEN}[旧诊断报告]${NC} ${DIAG_COUNT}个文件"
     fi
@@ -3039,7 +3039,7 @@ clean_system_caches() {
     echo "  1) 清理用户缓存（~/Library/Caches，排除系统关键缓存）"
     echo "  2) 清理旧日志文件（超过30天）"
     echo "  3) 清空废纸篓"
-    echo "  4) 清理 Devin 旧备份目录"
+    echo "  4) 清理 Windsurf 旧备份目录"
     echo "  5) 清理旧诊断报告"
     echo "  6) 刷新 DNS 缓存"
     echo "  7) 全部执行（安全项）"
@@ -3073,17 +3073,17 @@ clean_system_caches() {
             ;;
         4)
             if [ $BACKUP_COUNT -gt 0 ]; then
-                print_info "将删除 ${BACKUP_COUNT} 个 Devin 旧备份目录"
+                print_info "将删除 ${BACKUP_COUNT} 个 Windsurf 旧备份目录"
                 if confirm_action; then
-                    rm -rf "$HOME"/.devin-backup-* 2>/dev/null
-                    print_success "Devin 旧备份已清理"
+                    rm -rf "$HOME"/.windsurf-backup-* 2>/dev/null
+                    print_success "Windsurf 旧备份已清理"
                 fi
             else
                 print_info "没有旧备份需要清理"
             fi
             ;;
         5)
-            rm -f "$HOME"/devin-diagnostic-*.txt 2>/dev/null
+            rm -f "$HOME"/windsurf-diagnostic-*.txt 2>/dev/null
             print_success "旧诊断报告已清理"
             ;;
         6)
@@ -3104,12 +3104,12 @@ clean_system_caches() {
             
             # 清理旧备份
             if [ $BACKUP_COUNT -gt 0 ]; then
-                rm -rf "$HOME"/.devin-backup-* 2>/dev/null
-                print_success "Devin 旧备份已清理"
+                rm -rf "$HOME"/.windsurf-backup-* 2>/dev/null
+                print_success "Windsurf 旧备份已清理"
             fi
             
             # 清理旧诊断报告
-            rm -f "$HOME"/devin-diagnostic-*.txt 2>/dev/null
+            rm -f "$HOME"/windsurf-diagnostic-*.txt 2>/dev/null
             print_success "旧诊断报告已清理"
             
             # 刷新DNS
@@ -3197,7 +3197,7 @@ show_menu() {
     echo ""
     echo -e "${CYAN}请选择修复选项:${NC}"
     echo ""
-    echo -e "${YELLOW}== Devin 缓存清理 ==${NC}"
+    echo -e "${YELLOW}== Windsurf 缓存清理 ==${NC}"
     echo "  1) 清理 Cascade 缓存 (会清理对话历史)"
     echo "  2) 清理启动缓存 (不清理对话历史，推荐)"
     echo "  3) 清理扩展缓存 (不清理对话历史)"
@@ -3217,18 +3217,18 @@ show_menu() {
     echo "  11) 启用 Legacy 终端"
     echo ""
     echo -e "${YELLOW}== 其他 ==${NC}"
-    echo "  12) 修复 'Devin已损坏' 问题"
+    echo "  12) 修复 'Windsurf已损坏' 问题"
     echo "  13) 生成诊断报告"
     echo "  14) 完整修复 (执行所有步骤)"
     echo ""
     echo -e "${YELLOW}== 配置备份与 ID 管理 ==${NC}"
     echo "  15) 备份 MCP 配置 / Skills / 全局 Rules"
     echo "  16) 还原 MCP 配置 / Skills / 全局 Rules"
-    echo "  17) 重置 Devin ID (重新生成所有标识)"
+    echo "  17) 重置 Windsurf ID (重新生成所有标识)"
     echo ""
     echo -e "${YELLOW}== 深度优化 ==${NC}"
     echo "  18) 深度清理运行时缓存 (保留对话历史，推荐)"
-    echo "  19) Devin 进程资源监控"
+    echo "  19) Windsurf 进程资源监控"
     echo "  20) 一键智能优化 (保留对话历史)"
     echo ""
     echo -e "${YELLOW}== AI 工具清理 ==${NC}"
@@ -3245,9 +3245,9 @@ show_menu() {
     read -r choice
     
     case $choice in
-        1) if check_devin_running; then clean_cascade_cache; fi ;;
+        1) if check_windsurf_running; then clean_cascade_cache; fi ;;
         2) clean_startup_cache ;;
-        3) if check_devin_running; then clean_extension_cache; fi ;;
+        3) if check_windsurf_running; then clean_extension_cache; fi ;;
         4) clean_dev_caches ;;
         5) clean_system_caches ;;
         6) analyze_disk_usage ;;
@@ -3261,9 +3261,9 @@ show_menu() {
         14) full_repair ;;
         15) backup_mcp_skills_rules ;;
         16) restore_mcp_skills_rules ;;
-        17) reset_devin_id ;;
+        17) reset_windsurf_id ;;
         18) deep_clean_runtime_cache ;;
-        19) monitor_devin_processes ;;
+        19) monitor_windsurf_processes ;;
         20) smart_optimize ;;
         21) clean_ai_tool_garbage ;;
         22) reset_opencode_id ;;

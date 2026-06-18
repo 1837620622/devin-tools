@@ -1,10 +1,10 @@
 ﻿# ============================================================================
-# Devin 修复工具 - Windows 版本 (PowerShell)
-# 用于修复 Devin IDE 卡顿、Shell无法连接等常见问题
-# 基于官方文档: https://docs.devin.com/troubleshooting/devin-common-issues
-# 使用方法: 以管理员身份运行 PowerShell，执行 .\fix-devin-win.ps1
+# Windsurf 修复工具 - Windows 版本 (PowerShell)
+# 用于修复 Windsurf IDE 卡顿、Shell无法连接等常见问题
+# 基于官方文档: https://docs.windsurf.com/troubleshooting/windsurf-common-issues
+# 使用方法: 以管理员身份运行 PowerShell，执行 .\fix-windsurf-win.ps1
 # 作者: 传康KK
-# GitHub: https://github.com/1837620622/devin-fix-tool
+# GitHub: https://github.com/1837620622/windsurf-fix-tool
 # ============================================================================
 
 #Requires -Version 5.1
@@ -22,11 +22,11 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 # 路径定义
 # ----------------------------------------------------------------------------
 $CodeiumDir = "$env:USERPROFILE\.codeium"
-$DevinDir = "$CodeiumDir\devin"
-$DevinAppData = Join-Path $env:APPDATA "Devin"
-$CascadeDir = "$DevinDir\cascade"
-$BackupDir = "$env:USERPROFILE\.devin-backup-$(Get-Date -Format 'yyyyMMdd_HHmmss')"
-$SettingsJsonPath = "$env:APPDATA\Devin\User\settings.json"
+$WindsurfDir = "$CodeiumDir\windsurf"
+$WindsurfAppData = Join-Path $env:APPDATA "Windsurf"
+$CascadeDir = "$WindsurfDir\cascade"
+$BackupDir = "$env:USERPROFILE\.windsurf-backup-$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+$SettingsJsonPath = "$env:APPDATA\Windsurf\User\settings.json"
 $XdgConfigRoot = if ([string]::IsNullOrWhiteSpace($env:XDG_CONFIG_HOME)) { "$env:USERPROFILE\.config" } else { $env:XDG_CONFIG_HOME }
 $XdgCacheRoot = if ([string]::IsNullOrWhiteSpace($env:XDG_CACHE_HOME)) { "$env:USERPROFILE\.cache" } else { $env:XDG_CACHE_HOME }
 $XdgDataRoot = if ([string]::IsNullOrWhiteSpace($env:XDG_DATA_HOME)) { "$env:USERPROFILE\.local\share" } else { $env:XDG_DATA_HOME }
@@ -60,9 +60,9 @@ function Write-ColorOutput {
 function Write-Header {
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host "  Devin 修复工具 - Windows" -ForegroundColor Cyan
+    Write-Host "  Windsurf 修复工具 - Windows" -ForegroundColor Cyan
     Write-Host "  by 传康KK" -ForegroundColor Cyan
-    Write-Host "  github.com/1837620622/devin-fix-tool" -ForegroundColor Cyan
+    Write-Host "  github.com/1837620622/windsurf-fix-tool" -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host ""
 
@@ -73,11 +73,11 @@ function Write-Header {
     }
     else {
         Write-Host "[当前模式] 强制重置模式" -ForegroundColor Red -NoNewline
-        Write-Host "（默认）——所有清理菜单完成后自动重置 Devin 设备 ID"
-        Write-Host "  ⚠ 重置后 Devin 会被识别为新设备，可能需要重新登录一次" -ForegroundColor Yellow
+        Write-Host "（默认）——所有清理菜单完成后自动重置 Windsurf 设备 ID"
+        Write-Host "  ⚠ 重置后 Windsurf 会被识别为新设备，可能需要重新登录一次" -ForegroundColor Yellow
         Write-Host "  ⚠ 用途：绕过限速、刷新免费额度、解决服务端缓存异常" -ForegroundColor Yellow
         Write-Host "  如需关闭强制重置：" -NoNewline
-        Write-Host '  $env:FORCE_RESET_ID="0"; .\fix-devin-win.ps1' -ForegroundColor Cyan
+        Write-Host '  $env:FORCE_RESET_ID="0"; .\fix-windsurf-win.ps1' -ForegroundColor Cyan
     }
     Write-Host ""
     Write-Host "[始终保留] 对话和用户数据，任何模式下都不会被清理：" -ForegroundColor Green
@@ -86,10 +86,10 @@ function Write-Header {
     Write-Host "  - ~/.codeium/windsurf/skills/              技能"
     Write-Host "  - ~/.codeium/windsurf/mcp_config.json      MCP 配置"
     Write-Host "  - ~/.codeium/windsurf/user_settings.pb     用户偏好"
-    Write-Host "  - %APPDATA%\Devin\User\settings.json    编辑器设置"
+    Write-Host "  - %APPDATA%\Windsurf\User\settings.json    编辑器设置"
     Write-Host ""
     Write-Host "[清理后会被强制重置] 仅在强制重置模式下（默认）：" -ForegroundColor Red
-    Write-Host "  - installation_id                          Devin 安装标识"
+    Write-Host "  - installation_id                          Windsurf 安装标识"
     Write-Host "  - machineid                                机器标识"
     Write-Host "  - storage.json 中的 telemetry.* 多项标识"
     Write-Host ""
@@ -131,23 +131,23 @@ function Test-Administrator {
 }
 
 # ----------------------------------------------------------------------------
-# 检查Devin是否正在运行
+# 检查Windsurf是否正在运行
 # ----------------------------------------------------------------------------
-function Test-DevinRunning {
-    $processes = Get-Process -Name "Devin" -ErrorAction SilentlyContinue
+function Test-WindsurfRunning {
+    $processes = Get-Process -Name "Windsurf" -ErrorAction SilentlyContinue
     
     if ($processes) {
-        Write-ColorOutput "检测到 Devin 正在运行" "Warning"
-        Write-Host "  请先关闭 Devin 再执行修复操作"
+        Write-ColorOutput "检测到 Windsurf 正在运行" "Warning"
+        Write-Host "  请先关闭 Windsurf 再执行修复操作"
         
-        if (Confirm-Action "是否自动关闭Devin？") {
+        if (Confirm-Action "是否自动关闭Windsurf？") {
             $processes | Stop-Process -Force
             Start-Sleep -Seconds 2
-            Write-ColorOutput "Devin 已关闭" "Success"
+            Write-ColorOutput "Windsurf 已关闭" "Success"
             return $true
         }
         else {
-            Write-ColorOutput "请手动关闭 Devin 后重试" "Error"
+            Write-ColorOutput "请手动关闭 Windsurf 后重试" "Error"
             return $false
         }
     }
@@ -203,10 +203,10 @@ function Clear-ExtensionCache {
     if (Confirm-Action) {
         $cacheCleared = $false
         $cacheDirs = @(
-            (Join-Path $DevinAppData "CachedData"),
-            (Join-Path $DevinAppData "CachedExtensionVSIXs"),
-            (Join-Path $DevinDir "CachedData"),
-            (Join-Path $DevinDir "CachedExtensions")
+            (Join-Path $WindsurfAppData "CachedData"),
+            (Join-Path $WindsurfAppData "CachedExtensionVSIXs"),
+            (Join-Path $WindsurfDir "CachedData"),
+            (Join-Path $WindsurfDir "CachedExtensions")
         )
 
         foreach ($cacheDir in $cacheDirs) {
@@ -256,23 +256,23 @@ function Clear-StartupCache {
     Write-Host ""
     
     if (Confirm-Action) {
-        if (-not (Test-DevinRunning)) { return }
+        if (-not (Test-WindsurfRunning)) { return }
 
         # 清理 GPUCache
-        $cacheDir = Join-Path $DevinAppData "Cache"
+        $cacheDir = Join-Path $WindsurfAppData "Cache"
         if (Test-Path $cacheDir) {
             Remove-Item -Path $cacheDir -Recurse -Force -ErrorAction SilentlyContinue
             Write-ColorOutput "已清理 Cache" "Success"
         }
 
-        $gpuCache = Join-Path $DevinAppData "GPUCache"
+        $gpuCache = Join-Path $WindsurfAppData "GPUCache"
         if (Test-Path $gpuCache) {
             Remove-Item -Path $gpuCache -Recurse -Force -ErrorAction SilentlyContinue
             Write-ColorOutput "已清理 GPUCache" "Success"
         }
         
         # 清理 CachedData
-        foreach ($cachedData in @((Join-Path $DevinAppData "CachedData"), (Join-Path $DevinDir "CachedData"))) {
+        foreach ($cachedData in @((Join-Path $WindsurfAppData "CachedData"), (Join-Path $WindsurfDir "CachedData"))) {
             if (Test-Path $cachedData) {
                 Remove-Item -Path $cachedData -Recurse -Force -ErrorAction SilentlyContinue
                 Write-ColorOutput "已清理 $([System.IO.Path]::GetFileName($cachedData))" "Success"
@@ -280,7 +280,7 @@ function Clear-StartupCache {
         }
 
         # 清理扩展安装包缓存，兼容旧版目录结构。
-        foreach ($cachedExt in @((Join-Path $DevinAppData "CachedExtensionVSIXs"), (Join-Path $DevinDir "CachedExtensions"))) {
+        foreach ($cachedExt in @((Join-Path $WindsurfAppData "CachedExtensionVSIXs"), (Join-Path $WindsurfDir "CachedExtensions"))) {
             if (Test-Path $cachedExt) {
                 Remove-Item -Path $cachedExt -Recurse -Force -ErrorAction SilentlyContinue
                 Write-ColorOutput "已清理 $([System.IO.Path]::GetFileName($cachedExt))" "Success"
@@ -288,13 +288,13 @@ function Clear-StartupCache {
         }
         
         # 清理 Code Cache
-        $codeCache = Join-Path $DevinAppData "Code Cache"
+        $codeCache = Join-Path $WindsurfAppData "Code Cache"
         if (Test-Path $codeCache) {
             Remove-Item -Path $codeCache -Recurse -Force -ErrorAction SilentlyContinue
             Write-ColorOutput "已清理 Code Cache" "Success"
         }
 
-        foreach ($graphCache in @((Join-Path $DevinAppData "DawnWebGPUCache"), (Join-Path $DevinAppData "DawnGraphiteCache"))) {
+        foreach ($graphCache in @((Join-Path $WindsurfAppData "DawnWebGPUCache"), (Join-Path $WindsurfAppData "DawnGraphiteCache"))) {
             if (Test-Path $graphCache) {
                 Remove-Item -Path $graphCache -Recurse -Force -ErrorAction SilentlyContinue
                 Write-ColorOutput "已清理 $([System.IO.Path]::GetFileName($graphCache))" "Success"
@@ -302,7 +302,7 @@ function Clear-StartupCache {
         }
         
         # 清理旧日志
-        $logsDir = Join-Path $DevinAppData "logs"
+        $logsDir = Join-Path $WindsurfAppData "logs"
         if (Test-Path $logsDir) {
             Get-ChildItem -Path $logsDir -File -Recurse | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) } | Remove-Item -Force -ErrorAction SilentlyContinue
             Write-ColorOutput "已清理旧日志文件" "Success"
@@ -310,7 +310,7 @@ function Clear-StartupCache {
         
         Write-Host ""
         Write-ColorOutput "启动缓存清理完成！" "Success"
-        Write-ColorOutput "重启 Devin 后启动速度应该会改善" "Info"
+        Write-ColorOutput "重启 Windsurf 后启动速度应该会改善" "Info"
 
         # 清理完毕 -> 强制重置设备 ID（默认行为）
         Invoke-AutoResetAfterClean
@@ -326,7 +326,7 @@ function Clear-StartupCache {
 function Test-MCP {
     Write-ColorOutput "MCP (Model Context Protocol) 诊断..." "Info"
     
-    $mcpConfig = "$DevinDir\mcp_config.json"
+    $mcpConfig = "$WindsurfDir\mcp_config.json"
     $mcpConfigOld = "$CodeiumDir\mcp_config.json"
     
     Write-Host ""
@@ -404,7 +404,7 @@ function Test-MCP {
 function Reset-MCPConfig {
     Write-ColorOutput "重置 MCP 配置..." "Info"
     
-    $mcpConfig = "$DevinDir\mcp_config.json"
+    $mcpConfig = "$WindsurfDir\mcp_config.json"
     
     Write-Host ""
     Write-ColorOutput "此操作将备份并重置 MCP 配置文件" "Warning"
@@ -709,16 +709,16 @@ function Clear-SystemCaches {
         $totalSize += $size
     }
     
-    # Devin 旧备份
-    $backups = Get-ChildItem "$env:USERPROFILE\.devin-backup-*" -Directory -ErrorAction SilentlyContinue
+    # Windsurf 旧备份
+    $backups = Get-ChildItem "$env:USERPROFILE\.windsurf-backup-*" -Directory -ErrorAction SilentlyContinue
     if ($backups) {
         $bkSize = [math]::Round(($backups | Get-ChildItem -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum / 1MB)
-        Write-Host "  [Devin 旧备份] $($backups.Count)个备份目录 - " -NoNewline; Write-Host "${bkSize}MB" -ForegroundColor Yellow
+        Write-Host "  [Windsurf 旧备份] $($backups.Count)个备份目录 - " -NoNewline; Write-Host "${bkSize}MB" -ForegroundColor Yellow
         $totalSize += $bkSize
     }
     
     # 旧诊断报告
-    $diagReports = Get-ChildItem "$env:USERPROFILE\devin-diagnostic-*.txt" -ErrorAction SilentlyContinue
+    $diagReports = Get-ChildItem "$env:USERPROFILE\windsurf-diagnostic-*.txt" -ErrorAction SilentlyContinue
     if ($diagReports) {
         Write-Host "  [旧诊断报告] $($diagReports.Count)个文件" -ForegroundColor Green
     }
@@ -734,7 +734,7 @@ function Clear-SystemCaches {
     Write-Host "  1) 清理用户临时文件"
     Write-Host "  2) 清理 Windows 临时文件（需管理员）"
     Write-Host "  3) 清空回收站"
-    Write-Host "  4) 清理 Devin 旧备份目录"
+    Write-Host "  4) 清理 Windsurf 旧备份目录"
     Write-Host "  5) 清理旧诊断报告"
     Write-Host "  6) 刷新 DNS 缓存"
     Write-Host "  7) 全部执行（安全项）"
@@ -764,10 +764,10 @@ function Clear-SystemCaches {
         }
         "4" {
             if ($backups) {
-                Write-ColorOutput "将删除 $($backups.Count) 个 Devin 旧备份目录" "Info"
+                Write-ColorOutput "将删除 $($backups.Count) 个 Windsurf 旧备份目录" "Info"
                 if (Confirm-Action) {
                     $backups | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-                    Write-ColorOutput "Devin 旧备份已清理" "Success"
+                    Write-ColorOutput "Windsurf 旧备份已清理" "Success"
                 }
             }
             else {
@@ -792,7 +792,7 @@ function Clear-SystemCaches {
             
             if ($backups) {
                 $backups | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-                Write-ColorOutput "Devin 旧备份已清理" "Success"
+                Write-ColorOutput "Windsurf 旧备份已清理" "Success"
             }
             
             if ($diagReports) {
@@ -883,7 +883,7 @@ function Set-TerminalSettings {
     }
     else {
         Write-ColorOutput "未找到 settings.json 文件" "Warning"
-        Write-ColorOutput "Devin 可能尚未创建配置文件，请先启动一次 Devin" "Info"
+        Write-ColorOutput "Windsurf 可能尚未创建配置文件，请先启动一次 Windsurf" "Info"
     }
 }
 
@@ -899,8 +899,8 @@ function Test-UpdateIssues {
     if (Test-Administrator) {
         Write-ColorOutput "当前以管理员身份运行" "Warning"
         Write-Host ""
-        Write-Host "  Devin 以管理员模式运行时无法自动更新"
-        Write-Host "  解决方案: 以普通用户权限运行 Devin"
+        Write-Host "  Windsurf 以管理员模式运行时无法自动更新"
+        Write-Host "  解决方案: 以普通用户权限运行 Windsurf"
         Write-Host ""
     }
     else {
@@ -908,14 +908,14 @@ function Test-UpdateIssues {
     }
     
     # 检查用户安装 vs 系统安装
-    $userInstall = Test-Path "$env:LOCALAPPDATA\Programs\Devin"
-    $systemInstall = Test-Path "$env:ProgramFiles\Devin"
+    $userInstall = Test-Path "$env:LOCALAPPDATA\Programs\Windsurf"
+    $systemInstall = Test-Path "$env:ProgramFiles\Windsurf"
     
     if ($userInstall) {
-        Write-ColorOutput "检测到用户范围安装: $env:LOCALAPPDATA\Programs\Devin" "Info"
+        Write-ColorOutput "检测到用户范围安装: $env:LOCALAPPDATA\Programs\Windsurf" "Info"
     }
     if ($systemInstall) {
-        Write-ColorOutput "检测到系统范围安装: $env:ProgramFiles\Devin" "Info"
+        Write-ColorOutput "检测到系统范围安装: $env:ProgramFiles\Windsurf" "Info"
     }
 }
 
@@ -958,11 +958,11 @@ function Set-PSExecutionPolicy {
 function New-DiagnosticReport {
     Write-ColorOutput "生成诊断报告..." "Info"
     
-    $reportFile = "$env:USERPROFILE\devin-diagnostic-$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
+    $reportFile = "$env:USERPROFILE\windsurf-diagnostic-$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
     
     $report = @"
 ==========================================
-Devin 诊断报告 - Windows
+Windsurf 诊断报告 - Windows
 生成时间: $(Get-Date)
 ==========================================
 
@@ -975,12 +975,12 @@ $((Get-CimInstance -ClassName Win32_OperatingSystem).Caption)
 版本: $($PSVersionTable.PSVersion)
 执行策略: $(Get-ExecutionPolicy -Scope CurrentUser)
 
-## Devin 安装状态
-用户安装路径: $env:LOCALAPPDATA\Programs\Devin
-$(if (Test-Path "$env:LOCALAPPDATA\Programs\Devin") { "存在" } else { "不存在" })
+## Windsurf 安装状态
+用户安装路径: $env:LOCALAPPDATA\Programs\Windsurf
+$(if (Test-Path "$env:LOCALAPPDATA\Programs\Windsurf") { "存在" } else { "不存在" })
 
-系统安装路径: $env:ProgramFiles\Devin
-$(if (Test-Path "$env:ProgramFiles\Devin") { "存在" } else { "不存在" })
+系统安装路径: $env:ProgramFiles\Windsurf
+$(if (Test-Path "$env:ProgramFiles\Windsurf") { "存在" } else { "不存在" })
 
 ## Codeium 目录状态
 路径: $CodeiumDir
@@ -1014,13 +1014,13 @@ $(if (Test-Administrator) { "以管理员身份运行" } else { "普通用户权
 }
 
 # ----------------------------------------------------------------------------
-# 功能13: 清理Devin临时文件
+# 功能13: 清理Windsurf临时文件
 # ----------------------------------------------------------------------------
 function Clear-TempFiles {
     Write-ColorOutput "清理临时文件..." "Info"
     
     $tempDirs = @(
-        "$env:TEMP\devin*",
+        "$env:TEMP\windsurf*",
         "$env:TEMP\codeium*"
     )
     
@@ -1057,7 +1057,7 @@ function Start-FullRepair {
     Write-ColorOutput "此操作将执行所有修复步骤" "Warning"
     
     if (Confirm-Action) {
-        if (-not (Test-DevinRunning)) {
+        if (-not (Test-WindsurfRunning)) {
             return
         }
 
@@ -1081,7 +1081,7 @@ function Start-FullRepair {
 
         # 统一在完整修复末尾执行一次强制重置
         Invoke-AutoResetAfterClean
-        Write-ColorOutput "请重新启动 Devin" "Info"
+        Write-ColorOutput "请重新启动 Windsurf" "Info"
     }
     else {
         Write-ColorOutput "已取消操作" "Info"
@@ -1096,7 +1096,7 @@ function Test-NetworkWhitelist {
     
     $domains = @(
         "codeium.com",
-        "devin.com",
+        "windsurf.com",
         "codeiumdata.com"
     )
     
@@ -1123,7 +1123,7 @@ function Test-NetworkWhitelist {
     Write-Host ""
     Write-Host "如果连接失败，请将以下域名加入防火墙/VPN白名单:"
     Write-Host "  *.codeium.com" -ForegroundColor Yellow
-    Write-Host "  *.devin.com" -ForegroundColor Yellow
+    Write-Host "  *.windsurf.com" -ForegroundColor Yellow
     Write-Host "  *.codeiumdata.com" -ForegroundColor Yellow
     Write-Host ""
 }
@@ -1469,7 +1469,7 @@ function Clear-AIToolGarbage {
         Write-ColorOutput "四个 AI 工具垃圾缓存清理完成，总释放空间: $(Format-KbSize $script:TotalReleasedKb)" "Success"
         Write-ColorOutput "核心配置、MCP、登录认证、skills、history 和正式数据库均已保留" "Info"
 
-        # 清理完毕 -> 强制重置 Devin 设备 ID（默认行为）
+        # 清理完毕 -> 强制重置 Windsurf 设备 ID（默认行为）
         Invoke-AutoResetAfterClean
     }
     else {
@@ -1481,9 +1481,9 @@ function Clear-AIToolGarbage {
 # 计算当前可清理运行时缓存总大小（KB），用于优化前后对比
 # ----------------------------------------------------------------------------
 function Get-RuntimeCacheTotalKb {
-    $WsAppData = "$env:APPDATA\Devin"
-    $ImplicitDir = "$DevinDir\implicit"
-    $CodeTrackerDir = "$DevinDir\code_tracker"
+    $WsAppData = "$env:APPDATA\Windsurf"
+    $ImplicitDir = "$WindsurfDir\implicit"
+    $CodeTrackerDir = "$WindsurfDir\code_tracker"
     $Total = 0
 
     # 统计各缓存路径大小
@@ -1518,14 +1518,14 @@ function Get-RuntimeCacheTotalKb {
 }
 
 # ----------------------------------------------------------------------------
-# 功能16: 深度清理运行时缓存（保留对话历史，解决Devin运行卡顿）
+# 功能16: 深度清理运行时缓存（保留对话历史，解决Windsurf运行卡顿）
 # ----------------------------------------------------------------------------
 function Deep-CleanRuntimeCache {
     param([switch]$AutoConfirm)
 
-    $WsAppData = "$env:APPDATA\Devin"
-    $ImplicitDir = "$DevinDir\implicit"
-    $CodeTrackerDir = "$DevinDir\code_tracker"
+    $WsAppData = "$env:APPDATA\Windsurf"
+    $ImplicitDir = "$WindsurfDir\implicit"
+    $CodeTrackerDir = "$WindsurfDir\code_tracker"
 
     Write-ColorOutput "深度清理运行时缓存（保留对话历史）..." "Info"
     Write-Host ""
@@ -1544,7 +1544,7 @@ function Deep-CleanRuntimeCache {
         Write-ColorOutput "已启用自动确认模式" "Info"
     }
 
-    if (-not (Test-DevinRunning)) { return }
+    if (-not (Test-WindsurfRunning)) { return }
 
     # 初始化全局释放空间计数
     $script:TotalReleasedKb = 0
@@ -1564,8 +1564,8 @@ function Deep-CleanRuntimeCache {
     Remove-PathWithStats $ImplicitDir                                             "清理 implicit AI 索引缓存"
     Remove-PathWithStats $CodeTrackerDir                                          "清理 AI 代码追踪索引 (code_tracker)"
 
-    # 清理 Windows 临时文件夹中的 Devin 相关快照
-    Get-ChildItem -Path $env:TEMP -Filter "devin-terminal-*.snapshot" -ErrorAction SilentlyContinue |
+    # 清理 Windows 临时文件夹中的 Windsurf 相关快照
+    Get-ChildItem -Path $env:TEMP -Filter "windsurf-terminal-*.snapshot" -ErrorAction SilentlyContinue |
         Remove-Item -Force -ErrorAction SilentlyContinue
     Write-ColorOutput "清理 %TEMP% 中的终端快照" "Info"
 
@@ -1578,16 +1578,16 @@ function Deep-CleanRuntimeCache {
 }
 
 # ----------------------------------------------------------------------------
-# 功能17: Devin 进程资源监控
+# 功能17: Windsurf 进程资源监控
 # ----------------------------------------------------------------------------
-function Monitor-DevinProcesses {
-    Write-ColorOutput "Devin 进程资源监控..." "Info"
+function Monitor-WindsurfProcesses {
+    Write-ColorOutput "Windsurf 进程资源监控..." "Info"
 
     Write-Host ""
-    Write-Host "========== Devin 进程 ==========" -ForegroundColor Cyan
+    Write-Host "========== Windsurf 进程 ==========" -ForegroundColor Cyan
 
-    # 查找所有 devin 相关进程
-    $processes = Get-Process | Where-Object { $_.Name -like "*devin*" } 2>$null
+    # 查找所有 windsurf 相关进程
+    $processes = Get-Process | Where-Object { $_.Name -like "*windsurf*" } 2>$null
 
     if ($processes) {
         Write-Host ("{0,-10} {1,-30} {2,-12} {3,-12}" -f "PID", "进程名", "CPU(s)", "内存(MB)")
@@ -1600,7 +1600,7 @@ function Monitor-DevinProcesses {
         }
     }
     else {
-        Write-ColorOutput "未检测到 Devin 正在运行" "Warning"
+        Write-ColorOutput "未检测到 Windsurf 正在运行" "Warning"
     }
 
     Write-Host ""
@@ -1675,12 +1675,12 @@ function Backup-McpSkillsRules {
     Write-ColorOutput "备份 MCP 配置、Skills 和全局 Rules..." "Info"
 
     $BackupTimestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $BackupTarget = Join-Path $env:USERPROFILE ".devin-config-backup-$BackupTimestamp"
+    $BackupTarget = Join-Path $env:USERPROFILE ".windsurf-config-backup-$BackupTimestamp"
 
-    $McpConfig = Join-Path $DevinDir "mcp_config.json"
-    $SkillsDir = Join-Path $DevinDir "skills"
-    $GlobalRules = Join-Path $DevinDir "memories\global_rules.md"
-    $MemoriesDir = Join-Path $DevinDir "memories"
+    $McpConfig = Join-Path $WindsurfDir "mcp_config.json"
+    $SkillsDir = Join-Path $WindsurfDir "skills"
+    $GlobalRules = Join-Path $WindsurfDir "memories\global_rules.md"
+    $MemoriesDir = Join-Path $WindsurfDir "memories"
 
     Write-Host ""
     Write-Host "将备份以下内容:" -ForegroundColor Cyan
@@ -1745,12 +1745,12 @@ function Backup-McpSkillsRules {
 function Restore-McpSkillsRules {
     Write-ColorOutput "还原 MCP 配置、Skills 和全局 Rules..." "Info"
 
-    $McpConfig = Join-Path $DevinDir "mcp_config.json"
-    $SkillsDir = Join-Path $DevinDir "skills"
-    $GlobalRules = Join-Path $DevinDir "memories\global_rules.md"
-    $MemoriesDir = Join-Path $DevinDir "memories"
+    $McpConfig = Join-Path $WindsurfDir "mcp_config.json"
+    $SkillsDir = Join-Path $WindsurfDir "skills"
+    $GlobalRules = Join-Path $WindsurfDir "memories\global_rules.md"
+    $MemoriesDir = Join-Path $WindsurfDir "memories"
 
-    $BackupList = Get-ChildItem -Directory -Path $env:USERPROFILE -Filter ".devin-config-backup-*" -ErrorAction SilentlyContinue
+    $BackupList = Get-ChildItem -Directory -Path $env:USERPROFILE -Filter ".windsurf-config-backup-*" -ErrorAction SilentlyContinue
     if (-not $BackupList) { Write-ColorOutput "未找到任何配置备份" "Warning"; Write-ColorOutput "请先使用备份功能进行备份" "Info"; return }
 
     Write-Host ""
@@ -1810,18 +1810,18 @@ function Restore-McpSkillsRules {
         if ($RestoreMem -and (Test-Path (Join-Path $BackupPath "memories"))) { if (-not (Test-Path $MemoriesDir)) { New-Item -ItemType Directory -Path $MemoriesDir -Force | Out-Null }; Copy-Item (Join-Path $BackupPath "memories\*") $MemoriesDir -Recurse -Force -ErrorAction SilentlyContinue; Write-ColorOutput "Memories 已还原" "Success" }
         Write-Host ""
         Write-ColorOutput "还原完成！" "Success"
-        Write-ColorOutput "请重启 Devin 使更改生效" "Info"
+        Write-ColorOutput "请重启 Windsurf 使更改生效" "Info"
     }
     else { Write-ColorOutput "已取消操作" "Info" }
 }
 
 # ----------------------------------------------------------------------------
-# 内部函数: 自动重置 Devin ID（无确认提示，供清理流程自动调用）
+# 内部函数: 自动重置 Windsurf ID（无确认提示，供清理流程自动调用）
 # ----------------------------------------------------------------------------
-function Reset-DevinIdAuto {
-    $InstallationIdFile = Join-Path $DevinDir "installation_id"
-    $MachineIdFile = Join-Path $env:APPDATA "Devin\machineid"
-    $StorageJson = Join-Path $env:APPDATA "Devin\User\globalStorage\storage.json"
+function Reset-WindsurfIdAuto {
+    $InstallationIdFile = Join-Path $WindsurfDir "installation_id"
+    $MachineIdFile = Join-Path $env:APPDATA "Windsurf\machineid"
+    $StorageJson = Join-Path $env:APPDATA "Windsurf\User\globalStorage\storage.json"
 
     # 生成新的 UUID / 随机字节
     $NewInstallId = [guid]::NewGuid().ToString()
@@ -1855,8 +1855,8 @@ function Reset-DevinIdAuto {
     }
 
     # 【关键补强】重置 state.vscdb 的 ItemTable 中的 telemetry 键
-    # VSCode/Devin 的 globalStorage 会把 telemetry 同时存到 SQLite 里，只改 storage.json 会被覆盖
-    $StateDb = Join-Path $env:APPDATA "Devin\User\globalStorage\state.vscdb"
+    # VSCode/Windsurf 的 globalStorage 会把 telemetry 同时存到 SQLite 里，只改 storage.json 会被覆盖
+    $StateDb = Join-Path $env:APPDATA "Windsurf\User\globalStorage\state.vscdb"
     if (Test-Path $StateDb) {
         # 优先使用 sqlite3.exe（常见于 Git for Windows、Python、或手动安装）
         $sqliteExe = Get-Command sqlite3.exe -ErrorAction SilentlyContinue
@@ -1907,7 +1907,7 @@ except Exception as e:
 
     # 【Windows 特有】重置注册表 MachineGuid（需要管理员权限）
     # HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid 是 Windows 系统级机器标识
-    # Devin/Electron 应用会读取它作为设备指纹的一部分
+    # Windsurf/Electron 应用会读取它作为设备指纹的一部分
     $RegPath = "HKLM:\SOFTWARE\Microsoft\Cryptography"
     try {
         $isAdmin = Test-Administrator
@@ -1924,7 +1924,7 @@ except Exception as e:
         Write-ColorOutput "注册表 MachineGuid 重置失败: $_" "Warning"
     }
 
-    Write-ColorOutput "Devin ID 已自动重置（含 storage.json + state.vscdb + 注册表同步）" "Success"
+    Write-ColorOutput "Windsurf ID 已自动重置（含 storage.json + state.vscdb + 注册表同步）" "Success"
     Write-Host "  installation_id: $NewInstallId" -ForegroundColor Green
     Write-Host "  machineid:       $NewMachineId" -ForegroundColor Green
     Write-Host "  telemetry.*:     已同步到 storage.json 和 state.vscdb" -ForegroundColor Green
@@ -1934,7 +1934,7 @@ except Exception as e:
 # 内部函数: 清理流程末尾统一调用的"强制重置设备 ID"入口
 # 默认行为：强制重置（用户要求）
 # 逃生通道：设置环境变量 FORCE_RESET_ID=0 完全跳过
-#   例：$env:FORCE_RESET_ID=0; .\fix-devin-win.ps1
+#   例：$env:FORCE_RESET_ID=0; .\fix-windsurf-win.ps1
 # ----------------------------------------------------------------------------
 function Invoke-AutoResetAfterClean {
     # 用户主动关闭？
@@ -1949,36 +1949,36 @@ function Invoke-AutoResetAfterClean {
     }
 
     Write-Host ""
-    Write-Host "================ 清理后强制重置 Devin 设备 ID ================" -ForegroundColor Cyan
+    Write-Host "================ 清理后强制重置 Windsurf 设备 ID ================" -ForegroundColor Cyan
     Write-ColorOutput "此为用户默认行为：每次清理完成后自动重置设备标识" "Warning"
-    Write-ColorOutput "预期影响：Devin 服务端会识别为新设备，可能需要重新登录一次" "Warning"
-    Write-ColorOutput "如需关闭：下次运行前 `$env:FORCE_RESET_ID='0'; .\fix-devin-win.ps1" "Info"
+    Write-ColorOutput "预期影响：Windsurf 服务端会识别为新设备，可能需要重新登录一次" "Warning"
+    Write-ColorOutput "如需关闭：下次运行前 `$env:FORCE_RESET_ID='0'; .\fix-windsurf-win.ps1" "Info"
     Write-Host ""
 
-    # 关闭 Devin 才能可靠重置 storage.json
-    $wsRunning = Get-Process -Name "Devin" -ErrorAction SilentlyContinue
+    # 关闭 Windsurf 才能可靠重置 storage.json
+    $wsRunning = Get-Process -Name "Windsurf" -ErrorAction SilentlyContinue
     if ($wsRunning) {
-        Write-ColorOutput "检测到 Devin 正在运行，建议先关闭再重置" "Warning"
+        Write-ColorOutput "检测到 Windsurf 正在运行，建议先关闭再重置" "Warning"
         Write-ColorOutput "将等待 3 秒后继续（Ctrl+C 可取消）..." "Info"
         Start-Sleep -Seconds 3
     }
 
-    Reset-DevinIdAuto
+    Reset-WindsurfIdAuto
     Write-Host "================================================================" -ForegroundColor Cyan
 }
 
 # ----------------------------------------------------------------------------
-# 功能22: 重置 Devin ID
+# 功能22: 重置 Windsurf ID
 # ----------------------------------------------------------------------------
-function Reset-DevinId {
-    Write-ColorOutput "重置 Devin ID..." "Info"
+function Reset-WindsurfId {
+    Write-ColorOutput "重置 Windsurf ID..." "Info"
 
-    $InstallationIdFile = Join-Path $DevinDir "installation_id"
-    $MachineIdFile = Join-Path $env:APPDATA "Devin\machineid"
-    $StorageJson = Join-Path $env:APPDATA "Devin\User\globalStorage\storage.json"
+    $InstallationIdFile = Join-Path $WindsurfDir "installation_id"
+    $MachineIdFile = Join-Path $env:APPDATA "Windsurf\machineid"
+    $StorageJson = Join-Path $env:APPDATA "Windsurf\User\globalStorage\storage.json"
 
     Write-Host ""
-    Write-Host "当前 Devin ID 信息:" -ForegroundColor Cyan
+    Write-Host "当前 Windsurf ID 信息:" -ForegroundColor Cyan
     Write-Host ""
 
     if (Test-Path $InstallationIdFile) { Write-Host "  [installation_id] $(Get-Content $InstallationIdFile -ErrorAction SilentlyContinue)" -ForegroundColor Green }
@@ -1989,13 +1989,13 @@ function Reset-DevinId {
     else { Write-Host "  [storage.json]    文件不存在" -ForegroundColor Red }
 
     Write-Host ""
-    Write-ColorOutput "此操作将重新生成所有 Devin 标识 ID" "Warning"
+    Write-ColorOutput "此操作将重新生成所有 Windsurf 标识 ID" "Warning"
     Write-Host "  包括: installation_id, machineid, telemetry ID"
-    Write-Host "  重置后 Devin 将被视为全新安装"
+    Write-Host "  重置后 Windsurf 将被视为全新安装"
     Write-Host ""
 
-    if (Confirm-Action "确认重置 Devin ID？") {
-        if (-not (Test-DevinRunning)) { return }
+    if (Confirm-Action "确认重置 Windsurf ID？") {
+        if (-not (Test-WindsurfRunning)) { return }
 
         $NewInstallId = [guid]::NewGuid().ToString()
         $NewMachineId = [guid]::NewGuid().ToString()
@@ -2032,8 +2032,8 @@ function Reset-DevinId {
         Write-Host "  telemetry.machineId:    $NewTelemetryMachineId" -ForegroundColor Green
         Write-Host "  telemetry.sqmId:        $NewSqmId" -ForegroundColor Green
         Write-Host ""
-        Write-ColorOutput "Devin ID 重置完成！" "Success"
-        Write-ColorOutput "请重启 Devin 使更改生效" "Info"
+        Write-ColorOutput "Windsurf ID 重置完成！" "Success"
+        Write-ColorOutput "请重启 Windsurf 使更改生效" "Info"
     }
     else { Write-ColorOutput "已取消操作" "Info" }
 }
@@ -2045,7 +2045,7 @@ function Show-Menu {
     Write-Host ""
     Write-Host "请选择修复选项:" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "== Devin 缓存清理 ==" -ForegroundColor Yellow
+    Write-Host "== Windsurf 缓存清理 ==" -ForegroundColor Yellow
     Write-Host "  1) 清理 Cascade 缓存 (会清理对话历史)"
     Write-Host "  2) 清理启动缓存 (不清理对话历史，推荐)"
     Write-Host "  3) 清理扩展缓存 (不清理对话历史)"
@@ -2066,13 +2066,13 @@ function Show-Menu {
     Write-Host "== 其他 ==" -ForegroundColor Yellow
     Write-Host "  11) 检查更新问题"
     Write-Host "  12) 检查网络连接"
-    Write-Host "  13) 清理 Devin 临时文件"
+    Write-Host "  13) 清理 Windsurf 临时文件"
     Write-Host "  14) 生成诊断报告"
     Write-Host "  15) 完整修复 (执行所有步骤)"
     Write-Host ""
     Write-Host "== 深度优化 ==" -ForegroundColor Yellow
     Write-Host "  16) 深度清理运行时缓存 (保留对话历史，推荐)"
-    Write-Host "  17) Devin 进程资源监控"
+    Write-Host "  17) Windsurf 进程资源监控"
     Write-Host "  18) 一键智能优化 (保留对话历史)"
     Write-Host ""
     Write-Host "== AI 工具清理 ==" -ForegroundColor Yellow
@@ -2081,7 +2081,7 @@ function Show-Menu {
     Write-Host "== 配置备份与 ID 管理 ==" -ForegroundColor Yellow
     Write-Host "  20) 备份 MCP 配置 / Skills / 全局 Rules"
     Write-Host "  21) 还原 MCP 配置 / Skills / 全局 Rules"
-    Write-Host "  22) 重置 Devin ID (重新生成所有标识)"
+    Write-Host "  22) 重置 Windsurf ID (重新生成所有标识)"
     Write-Host ""
     Write-Host "  0) 退出"
     Write-Host ""
@@ -2089,9 +2089,9 @@ function Show-Menu {
     $choice = Read-Host "请输入选项 [0-22]"
     
     switch ($choice) {
-        "1" { if (Test-DevinRunning) { Clear-CascadeCache } }
+        "1" { if (Test-WindsurfRunning) { Clear-CascadeCache } }
         "2" { Clear-StartupCache }
-        "3" { if (Test-DevinRunning) { Clear-ExtensionCache } }
+        "3" { if (Test-WindsurfRunning) { Clear-ExtensionCache } }
         "4" { Clear-DevCaches }
         "5" { Clear-SystemCaches }
         "6" { Get-DiskAnalysis }
@@ -2105,15 +2105,15 @@ function Show-Menu {
         "14" { New-DiagnosticReport }
         "15" { Start-FullRepair }
         "16" { Deep-CleanRuntimeCache }
-        "17" { Monitor-DevinProcesses }
+        "17" { Monitor-WindsurfProcesses }
         "18" { Smart-Optimize }
         "19" { Clear-AIToolGarbage }
         "20" { Backup-McpSkillsRules }
         "21" { Restore-McpSkillsRules }
-        "22" { Reset-DevinId }
+        "22" { Reset-WindsurfId }
         "0" { 
             Write-Host ""
-            Write-ColorOutput "感谢使用 Devin 修复工具" "Info"
+            Write-ColorOutput "感谢使用 Windsurf 修复工具" "Info"
             exit 
         }
         default { Write-ColorOutput "无效选项" "Error" }

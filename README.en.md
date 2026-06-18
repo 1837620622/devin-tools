@@ -1,10 +1,10 @@
-# Devin Fix Tool
+# Windsurf Fix Tool
 
 ![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-blue?style=for-the-badge)
 ![Shell](https://img.shields.io/badge/Shell-Bash%20%7C%20PowerShell-green?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 
-A cross-platform troubleshooting toolkit for Devin IDE, focused on startup
+A cross-platform troubleshooting toolkit for Windsurf IDE, focused on startup
 lag, shell issues, MCP loading failures, oversized runtime caches, and AI tool
 cleanup.
 
@@ -20,7 +20,7 @@ cleanup.
 
 ## Verified Cleanup Boundaries
 
-The current guidance is based on local inspection, Devin troubleshooting
+The current guidance is based on local inspection, Windsurf troubleshooting
 docs, Electron storage behavior, and official PowerShell encoding guidance.
 
 - Best first target for lag:
@@ -49,33 +49,33 @@ docs, Electron storage behavior, and official PowerShell encoding guidance.
 ## Feature Matrix
 
 - macOS:
-  `fix-devin-mac.sh`
+  `fix-windsurf-mac.sh`
   Includes startup cache cleanup, deep runtime cleanup, MCP diagnostics,
   terminal fixes, ID reset, AI tool cleanup, conversation archiving, and
   long-chat lag diagnosis.
 - Linux:
-  `fix-devin-linux.sh`
+  `fix-windsurf-linux.sh`
   Includes startup cache cleanup, `chrome-sandbox` repair, systemd OSC
   troubleshooting, MCP diagnostics, and ID reset.
 - Windows:
-  `fix-devin-win.ps1`
+  `fix-windsurf-win.ps1`
   Includes startup cache cleanup, execution policy repair, update and network
   checks, deep runtime cleanup, and ID reset.
 - macOS system cleanup:
   `macos-safe-cleanup.sh`
-  Handles risk-tiered cleanup for system caches, dev-tool caches, Devin
+  Handles risk-tiered cleanup for system caches, dev-tool caches, Windsurf
   runtime caches, and common app caches.
 
 ## Repository Layout
 
 | File | Purpose |
 | --- | --- |
-| `fix-devin-mac.sh` | Main macOS repair script |
-| `fix-devin-linux.sh` | Main Linux repair script |
-| `fix-devin-win.ps1` | Main Windows repair script |
-| `fix-devin-win.bat` | Windows launcher for the PowerShell version |
+| `fix-windsurf-mac.sh` | Main macOS repair script |
+| `fix-windsurf-linux.sh` | Main Linux repair script |
+| `fix-windsurf-win.ps1` | Main Windows repair script |
+| `fix-windsurf-win.bat` | Windows launcher for the PowerShell version |
 | `macos-safe-cleanup.sh` | macOS system and developer cache cleanup script |
-| `DEVIN-CLEANING-GUIDE.md` | Guide for cleanup, lag, and device-ID modes |
+| `WINDSURF-CLEANING-GUIDE.md` | Guide for cleanup, lag, and device-ID modes |
 | `README.md` | Chinese documentation |
 | `README.en.md` | English documentation |
 
@@ -86,8 +86,8 @@ docs, Electron storage behavior, and official PowerShell encoding guidance.
 ```bash
 git clone https://github.com/1837620622/devin-tools.git
 cd devin
-chmod +x fix-devin-mac.sh
-./fix-devin-mac.sh
+chmod +x fix-windsurf-mac.sh
+./fix-windsurf-mac.sh
 ```
 
 ### Linux Launch
@@ -95,8 +95,8 @@ chmod +x fix-devin-mac.sh
 ```bash
 git clone https://github.com/1837620622/devin-tools.git
 cd devin
-chmod +x fix-devin-linux.sh
-./fix-devin-linux.sh
+chmod +x fix-windsurf-linux.sh
+./fix-windsurf-linux.sh
 ```
 
 ### Windows Launch
@@ -105,10 +105,10 @@ chmod +x fix-devin-linux.sh
 git clone https://github.com/1837620622/devin-tools.git
 cd devin
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-.\fix-devin-win.ps1
+.\fix-windsurf-win.ps1
 ```
 
-`fix-devin-win.ps1` is stored as `UTF-8 with BOM` for compatibility with
+`fix-windsurf-win.ps1` is stored as `UTF-8 with BOM` for compatibility with
 Windows PowerShell 5.1 when Chinese text is present. `GBK` is not recommended
 because it depends on the local system code page and is less reliable across
 GitHub, VS Code, and cross-platform environments.
@@ -136,7 +136,7 @@ chmod +x macos-safe-cleanup.sh
 5. Treat `cascade` cleanup as a last resort for severe startup failures.
 
 If you are specifically working on long-chat lag, also read the
-[Devin cleaning guide](./DEVIN-CLEANING-GUIDE.md).
+[Windsurf cleaning guide](./WINDSURF-CLEANING-GUIDE.md).
 
 ## Runtime Modes
 
@@ -152,13 +152,13 @@ The main scripts now support two modes:
 Examples:
 
 ```bash
-FORCE_RESET_ID=0 bash fix-devin-mac.sh
-FORCE_RESET_ID=0 bash fix-devin-linux.sh
+FORCE_RESET_ID=0 bash fix-windsurf-mac.sh
+FORCE_RESET_ID=0 bash fix-windsurf-linux.sh
 ```
 
 ```powershell
 $env:FORCE_RESET_ID="0"
-.\fix-devin-win.ps1
+.\fix-windsurf-win.ps1
 ```
 
 Both modes keep `cascade/*.pb` conversation history. The difference is whether
@@ -169,37 +169,37 @@ device identifiers are reset after cleanup.
 ### macOS
 
 ```bash
-rm -rf ~/Library/Application\ Support/Devin/CachedData
-rm -rf ~/Library/Application\ Support/Devin/Cache
-rm -rf ~/Library/Application\ Support/Devin/GPUCache
-rm -rf ~/Library/Application\ Support/Devin/Code\ Cache
-rm -rf ~/Library/Application\ Support/Devin/DawnWebGPUCache
-rm -rf ~/Library/Application\ Support/Devin/DawnGraphiteCache
-rm -rf ~/Library/Application\ Support/Devin/CachedExtensionVSIXs
+rm -rf ~/Library/Application\ Support/Windsurf/CachedData
+rm -rf ~/Library/Application\ Support/Windsurf/Cache
+rm -rf ~/Library/Application\ Support/Windsurf/GPUCache
+rm -rf ~/Library/Application\ Support/Windsurf/Code\ Cache
+rm -rf ~/Library/Application\ Support/Windsurf/DawnWebGPUCache
+rm -rf ~/Library/Application\ Support/Windsurf/DawnGraphiteCache
+rm -rf ~/Library/Application\ Support/Windsurf/CachedExtensionVSIXs
 ```
 
 ### Linux
 
 ```bash
-rm -rf ~/.config/Devin/CachedData
-rm -rf ~/.config/Devin/Cache
-rm -rf ~/.config/Devin/GPUCache
-rm -rf ~/.config/Devin/Code\ Cache
-rm -rf ~/.config/Devin/DawnWebGPUCache
-rm -rf ~/.config/Devin/DawnGraphiteCache
-rm -rf ~/.config/Devin/CachedExtensionVSIXs
+rm -rf ~/.config/Windsurf/CachedData
+rm -rf ~/.config/Windsurf/Cache
+rm -rf ~/.config/Windsurf/GPUCache
+rm -rf ~/.config/Windsurf/Code\ Cache
+rm -rf ~/.config/Windsurf/DawnWebGPUCache
+rm -rf ~/.config/Windsurf/DawnGraphiteCache
+rm -rf ~/.config/Windsurf/CachedExtensionVSIXs
 ```
 
 ### Windows
 
 ```powershell
-Remove-Item -Recurse -Force "$env:APPDATA\Devin\CachedData"
-Remove-Item -Recurse -Force "$env:APPDATA\Devin\Cache"
-Remove-Item -Recurse -Force "$env:APPDATA\Devin\GPUCache"
-Remove-Item -Recurse -Force "$env:APPDATA\Devin\Code Cache"
-Remove-Item -Recurse -Force "$env:APPDATA\Devin\DawnWebGPUCache"
-Remove-Item -Recurse -Force "$env:APPDATA\Devin\DawnGraphiteCache"
-Remove-Item -Recurse -Force "$env:APPDATA\Devin\CachedExtensionVSIXs"
+Remove-Item -Recurse -Force "$env:APPDATA\Windsurf\CachedData"
+Remove-Item -Recurse -Force "$env:APPDATA\Windsurf\Cache"
+Remove-Item -Recurse -Force "$env:APPDATA\Windsurf\GPUCache"
+Remove-Item -Recurse -Force "$env:APPDATA\Windsurf\Code Cache"
+Remove-Item -Recurse -Force "$env:APPDATA\Windsurf\DawnWebGPUCache"
+Remove-Item -Recurse -Force "$env:APPDATA\Windsurf\DawnGraphiteCache"
+Remove-Item -Recurse -Force "$env:APPDATA\Windsurf\CachedExtensionVSIXs"
 ```
 
 ## Folders To Avoid Cleaning By Default
@@ -211,7 +211,7 @@ Remove-Item -Recurse -Force "$env:APPDATA\Devin\CachedExtensionVSIXs"
 - `Service Worker`
 
 These locations are closer to persistent site and session data in Electron, so
-cleaning them may require signing in again for embedded Devin services.
+cleaning them may require signing in again for embedded Windsurf services.
 
 ## Common Issues
 
@@ -238,20 +238,20 @@ Check:
 1. Whether `~/.codeium/windsurf/mcp_config.json` is valid JSON.
 2. Whether Node.js, Python, and `npx` are installed.
 3. Whether required environment variables are present.
-4. Whether Devin logs show MCP launch errors.
+4. Whether Windsurf logs show MCP launch errors.
 
 ### 5. Terminal session gets stuck
 
 Common causes include heavy `zsh` themes, `Oh My Zsh`, `Powerlevel10k`, or
 Linux systemd OSC terminal context tracking.
 
-### 6. “Devin is damaged” on macOS
+### 6. “Windsurf is damaged” on macOS
 
 Make sure the app is in `/Applications`, matches your chip architecture, then
 run:
 
 ```bash
-xattr -c "/Applications/Devin.app/"
+xattr -c "/Applications/Windsurf.app/"
 ```
 
 ### 7. Silent crash on Linux
@@ -259,8 +259,8 @@ xattr -c "/Applications/Devin.app/"
 This often comes from broken `chrome-sandbox` permissions:
 
 ```bash
-sudo chown root:root /path/to/devin/chrome-sandbox
-sudo chmod 4755 /path/to/devin/chrome-sandbox
+sudo chown root:root /path/to/windsurf/chrome-sandbox
+sudo chmod 4755 /path/to/windsurf/chrome-sandbox
 ```
 
 ### 8. Chinese output is garbled on Windows
@@ -273,7 +273,7 @@ output encoding to UTF-8 at runtime. Reverting to `GBK` is not recommended.
 `macos-safe-cleanup.sh` is better suited for system-wide and developer-cache
 cleanup. Its current behavior is:
 
-- It cleans Devin `CachedData`, `Cache`, `GPUCache`, `Code Cache`, and
+- It cleans Windsurf `CachedData`, `Cache`, `GPUCache`, `Code Cache`, and
   `Dawn*Cache` by default.
 - It only displays the risk of `WebStorage` and keeps it by default.
 - It cleans `~/Library/Logs`, `~/Library/Caches`, and selected rebuildable
@@ -299,16 +299,16 @@ cleanup. Its current behavior is:
 
 - Conversation history:
   macOS / Linux use `~/.codeium/windsurf/cascade`;
-  Windows uses `%USERPROFILE%\.codeium\devin\cascade`.
+  Windows uses `%USERPROFILE%\.codeium\windsurf\cascade`.
 - MCP config:
   macOS / Linux use `~/.codeium/windsurf/mcp_config.json`;
-  Windows uses `%USERPROFILE%\.codeium\devin\mcp_config.json`.
+  Windows uses `%USERPROFILE%\.codeium\windsurf\mcp_config.json`.
 - macOS runtime cache:
-  `~/Library/Application Support/Devin`
+  `~/Library/Application Support/Windsurf`
 - Linux runtime cache:
-  `~/.config/Devin`
+  `~/.config/Windsurf`
 - Windows runtime cache:
-  `%APPDATA%\Devin`
+  `%APPDATA%\Windsurf`
 
 ## Network Whitelist
 
@@ -316,16 +316,16 @@ If you are behind a firewall, VPN, proxy, or enterprise network policy, make
 sure these domains are reachable:
 
 - `*.codeium.com`
-- `*.devin.com`
+- `*.windsurf.com`
 - `*.codeiumdata.com`
 
 ## References
 
-- [Official Devin Troubleshooting](https://docs.devin.com/troubleshooting/devin-common-issues)
-- [Devin Terminal Documentation](https://docs.devin.com/devin/terminal)
-- [Devin MCP Documentation](https://docs.devin.com/devin/cascade/mcp)
+- [Official Windsurf Troubleshooting](https://docs.windsurf.com/troubleshooting/windsurf-common-issues)
+- [Windsurf Terminal Documentation](https://docs.windsurf.com/windsurf/terminal)
+- [Windsurf MCP Documentation](https://docs.windsurf.com/windsurf/cascade/mcp)
 - [PowerShell File Encoding Guidance](https://learn.microsoft.com/en-us/powershell/scripting/dev-cross-plat/vscode/understanding-file-encoding?view=powershell-7.5)
-- [Devin cleaning guide](./DEVIN-CLEANING-GUIDE.md)
+- [Windsurf cleaning guide](./WINDSURF-CLEANING-GUIDE.md)
 
 ## Author
 

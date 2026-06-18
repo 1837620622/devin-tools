@@ -1,13 +1,13 @@
 @echo off
 chcp 65001 >nul 2>&1
-title Devin 修复工具 - Windows
+title Windsurf 修复工具 - Windows
 
 :: ============================================================================
-:: Devin 修复工具 - Windows 批处理版本
-:: 用于修复 Devin IDE 卡顿、Shell无法连接等常见问题
+:: Windsurf 修复工具 - Windows 批处理版本
+:: 用于修复 Windsurf IDE 卡顿、Shell无法连接等常见问题
 :: 使用方法: 双击运行或在命令提示符中执行
 :: 作者: 传康KK
-:: GitHub: https://github.com/1837620622/devin-fix-tool
+:: GitHub: https://github.com/1837620622/windsurf-fix-tool
 :: ============================================================================
 
 setlocal EnableDelayedExpansion
@@ -23,17 +23,17 @@ set "NC=%ESC%[0m"
 
 :: 路径定义
 set "CODEIUM_DIR=%USERPROFILE%\.codeium"
-set "DEVIN_DIR=%CODEIUM_DIR%\devin"
-set "CASCADE_DIR=%DEVIN_DIR%\cascade"
+set "WINDSURF_DIR=%CODEIUM_DIR%\windsurf"
+set "CASCADE_DIR=%WINDSURF_DIR%\cascade"
 
 :: 显示标题
 :header
 cls
 echo.
 echo %CYAN%========================================%NC%
-echo %CYAN%  Devin 修复工具 - Windows%NC%
+echo %CYAN%  Windsurf 修复工具 - Windows%NC%
 echo %CYAN%  by 传康KK%NC%
-echo %CYAN%  github.com/1837620622/devin-fix-tool%NC%
+echo %CYAN%  github.com/1837620622/windsurf-fix-tool%NC%
 echo %CYAN%========================================%NC%
 echo.
 
@@ -48,7 +48,7 @@ echo %CYAN%请选择修复选项:%NC%
 echo.
 echo   1) 清理 Cascade 缓存 (解决启动失败/卡顿)
 echo   2) 清理扩展缓存
-echo   3) 检查 Devin 进程
+echo   3) 检查 Windsurf 进程
 echo   4) 显示路径信息
 echo   5) 打开 PowerShell 完整版工具（含 AI 工具清理）
 echo.
@@ -81,15 +81,15 @@ if /i not "%confirm%"=="y" (
     goto continue
 )
 
-:: 检查Devin是否运行
-tasklist /FI "IMAGENAME eq Devin.exe" 2>NUL | find /I "Devin.exe" >NUL
+:: 检查Windsurf是否运行
+tasklist /FI "IMAGENAME eq Windsurf.exe" 2>NUL | find /I "Windsurf.exe" >NUL
 if not errorlevel 1 (
-    echo %YELLOW%[警告]%NC% Devin 正在运行，请先关闭
+    echo %YELLOW%[警告]%NC% Windsurf 正在运行，请先关闭
     goto continue
 )
 
 :: 备份并删除
-set "BACKUP_DIR=%USERPROFILE%\.devin-backup-%date:~0,4%%date:~5,2%%date:~8,2%"
+set "BACKUP_DIR=%USERPROFILE%\.windsurf-backup-%date:~0,4%%date:~5,2%%date:~8,2%"
 if not exist "%BACKUP_DIR%" mkdir "%BACKUP_DIR%"
 xcopy "%CASCADE_DIR%" "%BACKUP_DIR%\cascade\" /E /I /Q >nul 2>&1
 echo %BLUE%[信息]%NC% 已备份到: %BACKUP_DIR%
@@ -105,10 +105,10 @@ goto continue
 :: 清理扩展缓存
 :clean_extension
 echo.
-set "CACHE_DIR=%APPDATA%\Devin\CachedData"
-set "CACHE_DIR_LEGACY=%DEVIN_DIR%\CachedData"
-set "CACHE_VSIX_DIR=%APPDATA%\Devin\CachedExtensionVSIXs"
-set "CACHE_VSIX_DIR_LEGACY=%DEVIN_DIR%\CachedExtensions"
+set "CACHE_DIR=%APPDATA%\Windsurf\CachedData"
+set "CACHE_DIR_LEGACY=%WINDSURF_DIR%\CachedData"
+set "CACHE_VSIX_DIR=%APPDATA%\Windsurf\CachedExtensionVSIXs"
+set "CACHE_VSIX_DIR_LEGACY=%WINDSURF_DIR%\CachedExtensions"
 
 if not exist "%CACHE_DIR%" if not exist "%CACHE_DIR_LEGACY%" if not exist "%CACHE_VSIX_DIR%" if not exist "%CACHE_VSIX_DIR_LEGACY%" (
     echo %BLUE%[信息]%NC% 未找到可清理的扩展缓存目录
@@ -143,18 +143,18 @@ goto continue
 :: 检查进程
 :check_process
 echo.
-echo %BLUE%[信息]%NC% 检查 Devin 进程...
+echo %BLUE%[信息]%NC% 检查 Windsurf 进程...
 echo.
-tasklist /FI "IMAGENAME eq Devin.exe" 2>NUL | find /I "Devin.exe" >NUL
+tasklist /FI "IMAGENAME eq Windsurf.exe" 2>NUL | find /I "Windsurf.exe" >NUL
 if errorlevel 1 (
-    echo %GREEN%[成功]%NC% Devin 未运行
+    echo %GREEN%[成功]%NC% Windsurf 未运行
 ) else (
-    echo %YELLOW%[警告]%NC% Devin 正在运行
+    echo %YELLOW%[警告]%NC% Windsurf 正在运行
     echo.
-    set /p kill="是否关闭 Devin？[y/N]: "
+    set /p kill="是否关闭 Windsurf？[y/N]: "
     if /i "!kill!"=="y" (
-        taskkill /F /IM Devin.exe >nul 2>&1
-        echo %GREEN%[成功]%NC% Devin 已关闭
+        taskkill /F /IM Windsurf.exe >nul 2>&1
+        echo %GREEN%[成功]%NC% Windsurf 已关闭
     )
 )
 goto continue
@@ -165,9 +165,9 @@ echo.
 echo %CYAN%重要路径:%NC%
 echo.
 echo   Codeium 目录: %CODEIUM_DIR%
-echo   Devin 目录: %DEVIN_DIR%
+echo   Windsurf 目录: %WINDSURF_DIR%
 echo   Cascade 缓存: %CASCADE_DIR%
-echo   设置文件: %APPDATA%\Devin\User\settings.json
+echo   设置文件: %APPDATA%\Windsurf\User\settings.json
 echo.
 echo %CYAN%路径状态:%NC%
 echo.
@@ -180,7 +180,7 @@ goto continue
 echo.
 echo %BLUE%[信息]%NC% 启动 PowerShell 版本工具...
 echo.
-powershell -ExecutionPolicy Bypass -File "%~dp0fix-devin-win.ps1"
+powershell -ExecutionPolicy Bypass -File "%~dp0fix-windsurf-win.ps1"
 goto continue
 
 :invalid_option
@@ -195,7 +195,7 @@ goto header
 
 :exit_script
 echo.
-echo %BLUE%[信息]%NC% 感谢使用 Devin 修复工具
+echo %BLUE%[信息]%NC% 感谢使用 Windsurf 修复工具
 echo.
 pause
 exit /b 0
