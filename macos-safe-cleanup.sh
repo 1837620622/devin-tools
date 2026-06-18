@@ -13,7 +13,7 @@ fi
 # 针对你的系统定制，只清理可安全删除的缓存和临时文件
 # 不会清理：应用程序、用户文档、聊天记录、邮件、配置文件
 # 作者: 传康KK
-# GitHub: https://github.com/1837620622/windsurf-fix-tool
+# GitHub: https://github.com/1837620622/devin
 # ============================================================================
 
 # 颜色定义
@@ -100,8 +100,8 @@ confirm() {
         return 1
     fi
     if [ "$SAFE_AUTO" -eq 1 ] 2>/dev/null; then
-        case "$prompt" in
-            *"WPS Office 缓存"*|*"Telegram 缓存"*|*"Telegram 临时目录和日志"*|*"QQ 可重建缓存"*|*"Google Chrome 缓存"*|*"Chrome 缓存"*|*"Choice 临时与日志缓存"*|*"Claude Code 纯缓存"*|*"Gemini CLI 缓存"*|*"OpenCode 浏览器缓存"*|*"Codex 日志"*|*"清理所有 __pycache__"*|*"WebKit Caches"*|*"这些可重建缓存"*)
+            case "$prompt" in
+                *"WPS Office 缓存"*|*"Telegram 缓存"*|*"Telegram 临时目录和日志"*|*"Telegram 临时目录、日志和媒体缓存"*|*"QQ 可重建缓存"*|*"Google Chrome 缓存"*|*"Chrome 缓存"*|*"Choice 临时与日志缓存"*|*"Claude Code 纯缓存"*|*"Gemini CLI 缓存"*|*"OpenCode 浏览器缓存"*|*"Codex 日志"*|*"清理所有 __pycache__"*|*"WebKit Caches"*|*"这些可重建缓存"*|*"废纸篓"*|*"Devin 缓存"*|*"腾讯会议"*|*"Photos 缩略图"*|*"iMessage 缓存"*|*"uv/tools"*|*"诊断报告"*|*"Codeium/Windsurf AI"*|*"先退出"*)
                 printf "%b%s [Y/n]: y (safe-auto)%b\n" "${YELLOW}" "$prompt" "${NC}"
                 return 0
                 ;;
@@ -218,6 +218,37 @@ safe_remove_dir() {
     fi
 }
 
+# 优雅终止应用进程（先 AppleScript 退出，再 SIGTERM，最后 SIGKILL）
+# 避免清理运行中应用的缓存导致数据库损坏。只在用户确认后才调用。
+kill_app_process() {
+    local app_name="$1"
+    local bundle_id="$2"
+    if [ "$DRY_RUN" -eq 1 ] 2>/dev/null; then
+        print_info "  演练模式：不终止 $app_name"
+        return 0
+    fi
+    # 先尝试 AppleScript 优雅退出
+    osascript -e "tell application id \"$bundle_id\" to quit" 2>/dev/null
+    sleep 2
+    # 检查是否还在运行
+    if pgrep -f "$bundle_id" >/dev/null 2>&1; then
+        pkill -15 -f "$bundle_id" 2>/dev/null
+        sleep 2
+    fi
+    # 仍运行则强制杀
+    if pgrep -f "$bundle_id" >/dev/null 2>&1; then
+        pkill -9 -f "$bundle_id" 2>/dev/null
+        sleep 1
+    fi
+    if pgrep -f "$bundle_id" >/dev/null 2>&1; then
+        print_warning "  $app_name 仍在运行，可能需要手动退出"
+        return 1
+    else
+        print_success "  $app_name 已退出"
+        return 0
+    fi
+}
+
 # 判断路径是否属于绝对保护区。保护区只允许提示，不允许脚本删除。
 is_protected_path() {
     local target="$1"
@@ -237,13 +268,26 @@ is_protected_path() {
         "$HOME/Library/Application Support/Little Snitch"*|"$HOME/Library/Preferences/at.obdev.LittleSnitch"*|"/Library/Application Support/Objective Development/Little Snitch"*|"/Library/Preferences/at.obdev.LittleSnitch"*|"/Library/LaunchDaemons/at.obdev"*) return 0 ;;
 
         # Windsurf / Codex / MCP 运行态与登录态，避免清缓存后工具链失效。
-        "$HOME/.codeium/windsurf/mcp_config.json"|"$HOME/.codeium/windsurf/cascade"*|"$HOME/.codeium/windsurf/memories"*|"$HOME/.codeium/windsurf/skills"*|"$HOME/.codeium/windsurf/installation_id") return 0 ;;
+        "$HOME/.codeium/windsurf/mcp_config.json"|"$HOME/.codeium/windsurf/cascade"*|"$HOME/.codeium/windsurf/memories"*|"$HOME/.codeium/windsurf/skills"*|"$HOME/.codeium/windsurf/installation_id"|"$HOME/.codeium/windsurf/user_settings.pb") return 0 ;;
         "$HOME/Library/Application Support/Windsurf/Cookies"*|"$HOME/Library/Application Support/Windsurf/Local Storage"*|"$HOME/Library/Application Support/Windsurf/WebStorage"*|"$HOME/Library/Application Support/Windsurf/User/settings.json"|"$HOME/Library/Application Support/Windsurf/machineid") return 0 ;;
         "$CODEX_DIR/config.toml"*|"$CODEX_DIR/auth.json"*|"$CODEX_DIR/session_index.jsonl"*|"$CODEX_DIR/installation_id") return 0 ;;
         "$CODEX_DIR/plugins"*|"$CODEX_DIR/local-marketplaces"*|"$CODEX_DIR/skills"*|"$CODEX_DIR/sessions"*|"$CODEX_DIR/archived_sessions"*|"$CODEX_DIR/memories"*|"$CODEX_DIR/memories_1.sqlite"*) return 0 ;;
         "$CODEX_DIR/state_"*.sqlite*|"$CODEX_DIR/goals_"*.sqlite*|"$CODEX_DIR/computer-use"*|"$CODEX_DIR/vendor_imports"*|"$CODEX_DIR/cache"*) return 0 ;;
         "$CODEX_DIR/.tmp/plugins"*|"$CODEX_DIR/.tmp/plugins-clone-"*|"$CODEX_DIR/.tmp/marketplaces"*|"$CODEX_DIR/.tmp/bundled-marketplaces"*) return 0 ;;
         "$HOME/Library/Application Support/Codex"*) return 0 ;;
+        # Claude Code MCP 主配置与插件本体（只清 plugins/cache，不删 plugins 本体）
+        "$HOME/.claude.json"*|"$HOME/.claude/plugins"|"$HOME/.claude/plugins/"*) return 0 ;;
+        "$HOME/.claude/projects"*|"$HOME/.claude/skills"*|"$HOME/.claude/settings.json"*|"$HOME/.claude/CLAUDE.md"*|"$HOME/.claude/override.md") return 0 ;;
+        # 切号工具配置与账号凭据数据库（含多账号 token，严禁清理）
+        "$HOME/.cc-switch"*|"$HOME/.antigravity_cockpit"*|"$HOME/.antigravitycli"*) return 0 ;;
+        # 系统凭据目录
+        "$HOME/.ssh"*|"$HOME/.aws"*|"$HOME/.gnupg"*|"$HOME/.kaggle"*|"$HOME/.cdsapirc"*|"$HOME/.docker"*|"$HOME/.kube"*) return 0 ;;
+        # Devin 登录态与会话（只清纯缓存，保护登录态）
+        "$HOME/Library/Application Support/Devin/Local Storage"*|"$HOME/Library/Application Support/Devin/Cookies"*|"$HOME/Library/Application Support/Devin/User"*|"$HOME/Library/Application Support/Devin/IndexedDB"*) return 0 ;;
+        # Qoder CN 整个目录保护（清理后会丢失账号信息，用户明确要求不清理）
+        "$HOME/Library/Application Support/QoderCN"*) return 0 ;;
+        # MostLogin 内置浏览器二进制与登录态
+        "$HOME/Library/Application Support/MostLogin/chrome-bin"*|"$HOME/Library/Application Support/MostLogin/profile-user-data"*|"$HOME/Library/Application Support/MostLogin/Fonts"*) return 0 ;;
 
         # 聊天数据库、附件主目录与云文档缓存，本脚本只允许清理外围临时缓存。
         "$HOME/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/nt_qq_"*/nt_data/Msg*|"$HOME/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/"*/FileRecv*|"$HOME/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/"*/Image*) return 0 ;;
@@ -357,7 +401,7 @@ echo ""
 echo -e "${CYAN}============================================${NC}"
 echo -e "${CYAN}  macOS 系统数据安全清理工具${NC}"
 echo -e "${CYAN}  by 传康KK${NC}"
-echo -e "${CYAN}  github.com/1837620622/windsurf-fix-tool${NC}"
+echo -e "${CYAN}  github.com/1837620622/devin${NC}"
 echo -e "${CYAN}============================================${NC}"
 echo ""
 print_warning "此脚本只清理缓存和临时文件，不会删除重要数据"
@@ -385,11 +429,25 @@ echo -e "    ~/.codeium/windsurf/memories/                用户记忆"
 echo -e "    ~/.codeium/windsurf/skills/                  技能"
 echo -e "    ~/.codeium/windsurf/mcp_config.json          MCP 配置"
 echo -e "    ~/.codeium/windsurf/installation_id          设备标识"
+echo -e "    ~/.codeium/windsurf/user_settings.pb         用户设置"
 echo -e "    ~/Library/Application Support/Windsurf/Cookies*       登录 Cookies"
 echo -e "    ~/Library/Application Support/Windsurf/Local Storage  会话数据"
 echo -e "    ~/Library/Application Support/Windsurf/WebStorage     内嵌登录态"
 echo -e "    ~/Library/Application Support/Windsurf/User/settings.json  编辑器设置"
 echo -e "    ~/Library/Application Support/Windsurf/machineid      设备 ID"
+echo -e "  ${CYAN}Claude Code MCP 与插件${NC}"
+echo -e "    ~/.claude.json                               MCP 主配置（git/context7/playwright等）"
+echo -e "    ~/.claude/plugins/                           插件本体（只清 plugins/cache）"
+echo -e "    ~/.claude/projects/                          项目历史"
+echo -e "    ~/.claude/skills/                            技能"
+echo -e "    ~/.claude/settings.json                      编辑器设置"
+echo -e "  ${CYAN}切号工具与账号凭据${NC}"
+echo -e "    ~/.cc-switch/                                cc-switch 账号数据库与凭据"
+echo -e "    ~/.antigravity_cockpit/                      antigravity 多账号 token"
+echo -e "    ~/.ssh ~/.aws ~/.gnupg ~/.kaggle            系统凭据目录"
+echo -e "  ${CYAN}Qoder / Devin 登录态${NC}"
+echo -e "    ~/Library/Application Support/QoderCN/       Qoder 整个目录（清理会丢账号）"
+echo -e "    ~/Library/Application Support/Devin/Local Storage 等   Devin 登录态与会话"
 echo -e "  ${CYAN}Codex 插件、对话与记忆${NC}"
 echo -e "    ~/.codex/plugins/                         插件缓存和 MCP 插件本体"
 echo -e "    ~/.codex/local-marketplaces/              本地插件 marketplace"
@@ -582,6 +640,8 @@ if [ -d "$WECHAT_CONTAINER" ]; then
     WECHAT_DATA="$WECHAT_CONTAINER/Data/Library/Application Support/com.tencent.xinWeChat"
     WECHAT_CACHE="$WECHAT_CONTAINER/Data/Library/Caches"
     WECHAT_TMP="$WECHAT_CONTAINER/Data/tmp"
+    # 微信新版本 app_data 路径（日志/插件/radium 缓存）
+    WECHAT_APPDATA="$WECHAT_CONTAINER/Data/Documents/app_data"
     
     WECHAT_CLEANABLE=0
     [ -d "$WECHAT_CACHE" ] && WECHAT_CLEANABLE=$((WECHAT_CLEANABLE + $(get_size_bytes "$WECHAT_CACHE")))
@@ -596,10 +656,20 @@ if [ -d "$WECHAT_CONTAINER" ]; then
             [ -d "$cache_dir" ] && WECHAT_CLEANABLE=$((WECHAT_CLEANABLE + $(get_size_bytes "$cache_dir")))
         done
     fi
+    # app_data 下的日志/插件/radium 缓存（可重建）
+    WECHAT_LOG="$WECHAT_APPDATA/log"
+    WECHAT_XPLUGIN="$WECHAT_APPDATA/xplugin/plugins"
+    WECHAT_RADIUM="$WECHAT_APPDATA/radium"
+    [ -d "$WECHAT_LOG" ] && WECHAT_CLEANABLE=$((WECHAT_CLEANABLE + $(get_size_bytes "$WECHAT_LOG")))
+    [ -d "$WECHAT_XPLUGIN" ] && WECHAT_CLEANABLE=$((WECHAT_CLEANABLE + $(get_size_bytes "$WECHAT_XPLUGIN")))
+    [ -d "$WECHAT_RADIUM" ] && WECHAT_CLEANABLE=$((WECHAT_CLEANABLE + $(get_size_bytes "$WECHAT_RADIUM")))
     
     if [ "$WECHAT_CLEANABLE" -gt 0 ]; then
         echo -e "  ${CYAN}微信可清理缓存与临时文件${NC}: $(format_size $WECHAT_CLEANABLE)"
-        if confirm "  是否清理微信缓存（包含临时文件、图片及视频缓存等，不影响聊天记录）？"; then
+        print_info "  包含：缓存、临时文件、日志(.xlog)、插件缓存、radium缓存（均会自动重建）"
+        print_info "  已保护：聊天记录、聊天数据库、附件主目录、账号配置"
+        if confirm "  是否先退出微信再清理缓存（避免数据库损坏）？"; then
+            kill_app_process "微信" "com.tencent.xinWeChat"
             # ----------------------------------------------------------------
             # 级联静默清理所有子目录，确保交互流畅
             # ----------------------------------------------------------------
@@ -611,6 +681,10 @@ if [ -d "$WECHAT_CONTAINER" ]; then
                 silent_clean_dir "$IMAGE_CACHE" "微信图片缓存"
                 silent_clean_dir "$VIDEO_CACHE" "微信视频缓存"
             fi
+            # app_data 下的可重建缓存
+            silent_clean_dir "$WECHAT_LOG" "微信运行日志 (.xlog，会自动重建)"
+            silent_clean_dir "$WECHAT_XPLUGIN" "微信插件缓存 (会自动重新下载)"
+            silent_clean_dir "$WECHAT_RADIUM" "微信 radium 缓存 (会自动重建)"
             print_success "  微信缓存清理完成"
         else
             print_info "  已跳过微信缓存清理"
@@ -652,18 +726,26 @@ TG_CACHE="$HOME/Library/Group Containers/6N38VWS5BX.ru.keepcoder.Telegram"
 if [ -d "$TG_CACHE" ]; then
     TG_TARGETS=()
     while IFS= read -r tg_dir; do TG_TARGETS+=("$tg_dir"); done < <(find "$TG_CACHE" -type d \( -name "Caches" -o -name "tmp" -o -name "temp" -o -name "logs" \) 2>/dev/null)
+    # Telegram 媒体缓存（cached 目录，按消息ID命名，会自动重新下载）
+    while IFS= read -r tg_cached; do TG_TARGETS+=("$tg_cached"); done < <(find "$TG_CACHE" -type d -name "cached" 2>/dev/null)
+    # Telegram 动画贴纸缓存（trlottie-animations，会自动重新下载）
+    add_target_if_exists_tg() { [ -d "$1" ] && TG_TARGETS+=("$1"); }
+    add_target_if_exists_tg "$TG_CACHE/appstore/trlottie-animations"
+    
     TG_CLEANABLE=0
     for tg_dir in "${TG_TARGETS[@]}"; do
         [ -d "$tg_dir" ] && TG_CLEANABLE=$((TG_CLEANABLE + $(get_size_bytes "$tg_dir")))
     done
     if [ "$TG_CLEANABLE" -gt 0 ]; then
-        echo -e "  ${CYAN}Telegram 可清理临时目录和日志${NC}: $(format_size $TG_CLEANABLE)"
-        print_info "  已排除 Telegram postbox 数据库和 media 媒体主缓存"
-        if confirm "  是否清理 Telegram 临时目录和日志？"; then
+        echo -e "  ${CYAN}Telegram 可清理临时目录、日志和媒体缓存${NC}: $(format_size $TG_CLEANABLE)"
+        print_info "  包含：Caches、tmp、temp、logs、cached(媒体缓存)、trlottie(动画贴纸缓存)"
+        print_info "  已保护：postbox 数据库（聊天记录）、accounts-metadata、账号配置"
+        if confirm "  是否先退出 Telegram 再清理缓存（避免数据库损坏）？"; then
+            kill_app_process "Telegram" "ru.keepcoder.Telegram"
             for tg_dir in "${TG_TARGETS[@]}"; do
                 safe_remove_rebuildable_path "$tg_dir" "Telegram 可重建缓存 $(basename "$tg_dir")"
             done
-            print_success "  Telegram 临时目录和日志处理完成"
+            print_success "  Telegram 临时目录、日志和媒体缓存处理完成"
         else
             print_info "  已跳过 Telegram 缓存清理"
         fi
@@ -680,6 +762,8 @@ if [ -d "$QQ_CONTAINER" ]; then
     QQ_CACHE="$QQ_CONTAINER/Data/Library/Caches"
     QQ_TMP="$QQ_CONTAINER/Data/tmp"
     QQ_DATA="$QQ_CONTAINER/Data/Library/Application Support/QQ"
+    # QQ 小程序数据（Group Container，会自动重新下载）
+    QQ_QQEX="$HOME/Library/Group Containers/FN2V63AD2J.com.tencent/qqex"
     
     QQ_CLEANABLE=0
     [ -d "$QQ_CACHE" ] && QQ_CLEANABLE=$((QQ_CLEANABLE + $(get_size_bytes "$QQ_CACHE")))
@@ -691,11 +775,26 @@ if [ -d "$QQ_CONTAINER" ]; then
         while IFS= read -r qq_cache_dir; do
             [ -d "$qq_cache_dir" ] && QQ_CLEANABLE=$((QQ_CLEANABLE + $(get_size_bytes "$qq_cache_dir")))
         done < <(find "$QQ_DATA" -type d \( -name "Cache" -o -name "Code Cache" -o -name "GPUCache" -o -name "DawnWebGPUCache" -o -name "DawnGraphiteCache" -o -name "ThumbTemp" -o -name "log-cache" -o -name "nt_temp" \) 2>/dev/null)
+        # nt_data 下的日志和缓存（可重建）
+        while IFS= read -r qq_ntdir; do
+            [ -d "$qq_ntdir" ] && QQ_CLEANABLE=$((QQ_CLEANABLE + $(get_size_bytes "$qq_ntdir")))
+        done < <(find "$QQ_DATA" -type d \( -path "*/nt_data/log" -o -path "*/nt_data/log-cache" -o -path "*/nt_data/Pic" -o -path "*/nt_data/Video" -o -path "*/nt_data/Emoji" -o -path "*/nt_data/avatar" \) 2>/dev/null)
+        # 旧版本残留目录（非当前版本的版本号目录，可安全删除）
+        if [ -d "$QQ_DATA/versions" ]; then
+            while IFS= read -r qq_oldver; do
+                [ -d "$qq_oldver" ] && QQ_CLEANABLE=$((QQ_CLEANABLE + $(get_size_bytes "$qq_oldver")))
+            done < <(find "$QQ_DATA/versions" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
+        fi
     fi
+    # qqex 小程序数据
+    [ -d "$QQ_QQEX" ] && QQ_CLEANABLE=$((QQ_CLEANABLE + $(get_size_bytes "$QQ_QQEX")))
     
     if [ "$QQ_CLEANABLE" -gt 0 ]; then
         echo -e "  ${CYAN}QQ 可清理缓存与临时文件${NC}: $(format_size $QQ_CLEANABLE)"
-        if confirm "  是否清理 QQ 可重建缓存（临时文件、缩略图、日志、旧更新包；不删除 FileRecv 和聊天附件）？"; then
+        print_info "  包含：缓存、日志、旧版本残留、小程序数据、图片/表情/视频缓存（均会自动重建）"
+        print_info "  已保护：FileRecv、聊天消息(Msg)、聊天附件原图、账号配置"
+        if confirm "  是否先退出 QQ 再清理缓存（避免数据库损坏）？"; then
+            kill_app_process "QQ" "com.tencent.qq"
             silent_clean_dir "$QQ_CACHE" "QQ缓存目录"
             silent_clean_dir "$QQ_TMP" "QQ临时文件"
             if [ -d "$QQ_DATA" ]; then
@@ -703,10 +802,22 @@ if [ -d "$QQ_CONTAINER" ]; then
                 while IFS= read -r qq_cache_dir; do
                     safe_remove_rebuildable_path "$qq_cache_dir" "QQ 可重建缓存 $(basename "$qq_cache_dir")"
                 done < <(find "$QQ_DATA" -type d \( -name "Cache" -o -name "Code Cache" -o -name "GPUCache" -o -name "DawnWebGPUCache" -o -name "DawnGraphiteCache" -o -name "ThumbTemp" -o -name "log-cache" -o -name "nt_temp" \) 2>/dev/null)
+                # nt_data 下的日志和缓存
+                while IFS= read -r qq_ntdir; do
+                    safe_remove_rebuildable_path "$qq_ntdir" "QQ $(basename "$qq_ntdir") 缓存"
+                done < <(find "$QQ_DATA" -type d \( -path "*/nt_data/log" -o -path "*/nt_data/log-cache" -o -path "*/nt_data/Pic" -o -path "*/nt_data/Video" -o -path "*/nt_data/Emoji" -o -path "*/nt_data/avatar" \) 2>/dev/null)
+                # 旧版本残留目录
+                find "$QQ_DATA/versions" -maxdepth 1 -type d 2>/dev/null | while IFS= read -r qq_oldver; do
+                    [ "$qq_oldver" = "$QQ_DATA/versions" ] && continue
+                    safe_remove_rebuildable_path "$qq_oldver" "QQ 旧版本残留 $(basename "$qq_oldver")"
+                done
+                # 旧更新压缩包
                 find "$QQ_DATA/versions" -maxdepth 1 -type f -name "*.zip" 2>/dev/null | while IFS= read -r qq_zip; do
                     safe_remove_rebuildable_path "$qq_zip" "QQ 旧更新压缩包"
                 done
             fi
+            # qqex 小程序数据（会自动重新下载）
+            safe_remove_rebuildable_path "$QQ_QQEX" "QQ 小程序数据 (qqex，会自动重新下载)"
             print_success "  QQ 缓存清理完成"
         else
             print_info "  已跳过 QQ 缓存清理"
@@ -746,7 +857,9 @@ if [ -d "$CHROME_DIR" ]; then
 
     if [ "$CHROME_CLEANABLE" -gt 0 ]; then
         echo -e "  ${CYAN}Chrome 可清理缓存${NC}: $(format_size $CHROME_CLEANABLE)"
-        if confirm "  是否清理 Google Chrome 缓存与临时文件（包含网页缓存、渲染器/着色器缓存等 14 项）？"; then
+        print_info "  已保护：登录态、书签、扩展配置、Service Worker 离线数据"
+        if confirm "  是否先退出 Chrome 再清理缓存（避免数据库损坏）？"; then
+            kill_app_process "Google Chrome" "com.google.Chrome"
             silent_remove_dir "$CHROME_USER_CACHE" "Chrome 实际网页缓存"
             silent_remove_dir "$CHROME_USER_CODE" "Chrome 实际代码缓存"
             silent_remove_dir "$CHROME_USER_GPU" "Chrome 实际 GPU 缓存"
@@ -1280,9 +1393,13 @@ echo ""
 
 # 30. /private/var/folders 定向垃圾清理
 print_info "30. /private/var/folders 定向垃圾清理"
-print_warning "只清理 3 天以上、已识别为可重复生成的临时克隆、memmap 和构建缓存"
+print_warning "只清理已识别为可重复生成的临时克隆、memmap 和构建缓存"
 TARGET_PATHS=()
-while IFS= read -r path; do TARGET_PATHS+=("$path"); done < <(find /private/var/folders -path "*/X/com.google.Chrome.code_sign_clone" -mtime +3 2>/dev/null)
+# Chrome 代码签名临时克隆（684M+，可安全删除，Chrome启动自动重建）
+while IFS= read -r path; do TARGET_PATHS+=("$path"); done < <(find /private/var/folders -path "*/X/com.google.Chrome.code_sign_clone" 2>/dev/null)
+# Codex 代码签名临时克隆（可达7.1G，每次启动累积副本，可安全删除）
+while IFS= read -r path; do TARGET_PATHS+=("$path"); done < <(find /private/var/folders -path "*/X/com.openai.codex.code_sign_clone" 2>/dev/null)
+# 其他可重建临时目录（3天以上）
 while IFS= read -r path; do TARGET_PATHS+=("$path"); done < <(find /private/var/folders -path "*/T/joblib_memmapping_folder_*" -mtime +3 2>/dev/null)
 while IFS= read -r path; do TARGET_PATHS+=("$path"); done < <(find /private/var/folders -path "*/T/node-gyp-tmp-*" -mtime +3 2>/dev/null)
 while IFS= read -r path; do TARGET_PATHS+=("$path"); done < <(find /private/var/folders -path "*/T/node-compile-cache" -mtime +3 2>/dev/null)
@@ -1304,6 +1421,7 @@ while IFS= read -r _; do
     RECENT_COUNT=$((RECENT_COUNT + 1))
 done < <(
     find /private/var/folders \( -path "*/X/com.google.Chrome.code_sign_clone" \
+        -o -path "*/X/com.openai.codex.code_sign_clone" \
         -o -path "*/T/joblib_memmapping_folder_*" \
         -o -path "*/T/node-gyp-tmp-*" \
         -o -path "*/T/node-compile-cache" \) -mtime -3 2>/dev/null
@@ -1646,6 +1764,210 @@ if [ "$REBUILDABLE_TOTAL" -gt 0 ] 2>/dev/null; then
     fi
 else
     print_info "  未检测到本机实测新增可重建缓存"
+fi
+echo ""
+
+# ============================================================================
+# 第七部分: 实测新增安全清理项（废纸篓/AI工具/Photos/manicode/iMessage等）
+# ============================================================================
+echo -e "\n${GREEN}${SECTION_BAR}${NC}"
+echo -e "${GREEN}  第七部分: 实测新增安全清理（废纸篓/AI工具/Photos/manicode/iMessage等）${NC}"
+echo -e "${GREEN}${SECTION_BAR}${NC}\n"
+
+# 36. 废纸篓
+print_info "36. 废纸篓"
+TRASH_DIR="$HOME/.Trash"
+if [ -d "$TRASH_DIR" ]; then
+    TRASH_SIZE=$(get_size_bytes "$TRASH_DIR")
+    if [ "$TRASH_SIZE" -gt 0 ]; then
+        echo -e "  ${CYAN}废纸篓${NC}: $(format_size $TRASH_SIZE)"
+        if confirm "  是否清空废纸篓？"; then
+            silent_clean_dir "$TRASH_DIR" "废纸篓"
+        else
+            print_info "  已跳过"
+        fi
+    else
+        print_info "  废纸篓已是空的"
+    fi
+fi
+echo ""
+
+# 37. Qoder CN IDE（已保护：清理后会丢失账号信息）
+print_info "37. Qoder CN IDE（已保护，不清理）"
+QODER_DIR="$HOME/Library/Application Support/QoderCN"
+if [ -d "$QODER_DIR" ]; then
+    QODER_SIZE=$(get_size_bytes "$QODER_DIR")
+    echo -e "  ${YELLOW}[已保护]${NC} Qoder CN: $(format_size $QODER_SIZE)（清理后会丢失账号信息，已加入保护清单）"
+fi
+echo ""
+
+# 38. Devin 缓存（保护登录态和会话）
+print_info "38. Devin 缓存"
+DEVIN_DIR="$HOME/Library/Application Support/Devin"
+if [ -d "$DEVIN_DIR" ]; then
+    DEVIN_CLEANABLE=0
+    for dd in "CachedData" "CachedProfilesData" "GPUCache" "DawnWebGPUCache" "DawnGraphiteCache" "clp" "logs"; do
+        [ -d "$DEVIN_DIR/$dd" ] && DEVIN_CLEANABLE=$((DEVIN_CLEANABLE + $(get_size_bytes "$DEVIN_DIR/$dd")))
+    done
+    if [ "$DEVIN_CLEANABLE" -gt 0 ]; then
+        echo -e "  ${CYAN}Devin 可清理缓存${NC}: $(format_size $DEVIN_CLEANABLE)"
+        print_info "  已保护：Local Storage、Cookies、User、IndexedDB（登录态与会话）"
+        if confirm "  是否先退出 Devin 再清理缓存？"; then
+            kill_app_process "Devin" "com.devin.desktop"
+            for dd in "CachedData" "CachedProfilesData" "GPUCache" "DawnWebGPUCache" "DawnGraphiteCache" "clp" "logs"; do
+                silent_remove_dir "$DEVIN_DIR/$dd" "Devin $dd"
+            done
+            print_success "  Devin 缓存清理完成"
+        else
+            print_info "  已跳过"
+        fi
+    else
+        print_info "  未检测到 Devin 可清理缓存"
+    fi
+fi
+echo ""
+
+# 39. 腾讯会议缓存
+print_info "39. 腾讯会议缓存"
+MEETING_DIR="$HOME/Library/Containers/com.tencent.meeting"
+if [ -d "$MEETING_DIR" ]; then
+    MEETING_DATA="$MEETING_DIR/Data/Library/Global/Data"
+    MEETING_LOGS="$MEETING_DIR/Data/Library/Global/Logs"
+    MEETING_CLEANABLE=0
+    [ -d "$MEETING_DATA" ] && MEETING_CLEANABLE=$((MEETING_CLEANABLE + $(get_size_bytes "$MEETING_DATA")))
+    [ -d "$MEETING_LOGS" ] && MEETING_CLEANABLE=$((MEETING_CLEANABLE + $(get_size_bytes "$MEETING_LOGS")))
+    if [ "$MEETING_CLEANABLE" -gt 0 ]; then
+        echo -e "  ${CYAN}腾讯会议可清理缓存${NC}: $(format_size $MEETING_CLEANABLE)"
+        if confirm "  是否先退出腾讯会议再清理缓存？"; then
+            kill_app_process "腾讯会议" "com.tencent.meeting"
+            silent_clean_dir "$MEETING_DATA" "腾讯会议缓存数据"
+            silent_clean_dir "$MEETING_LOGS" "腾讯会议日志"
+            print_success "  腾讯会议缓存清理完成"
+        else
+            print_info "  已跳过"
+        fi
+    else
+        print_info "  未检测到腾讯会议可清理缓存"
+    fi
+fi
+echo ""
+
+# 40. Photos 缩略图缓存（系统会自动重建）
+print_info "40. Photos 缩略图缓存（derivatives，系统自动重建）"
+PHOTOS_DERIV="$HOME/Pictures/Photos Library.photoslibrary/resources/derivatives"
+if [ -d "$PHOTOS_DERIV" ]; then
+    PHOTOS_SIZE=$(get_size_bytes "$PHOTOS_DERIV")
+    if [ "$PHOTOS_SIZE" -gt 0 ]; then
+        echo -e "  ${CYAN}Photos derivatives 缩略图缓存${NC}: $(format_size $PHOTOS_SIZE)"
+        print_info "  删除后系统会自动重建缩略图，不影响原始照片"
+        print_info "  已保护：originals（原始照片）、database（照片数据库）"
+        if confirm "  是否清理 Photos 缩略图缓存？"; then
+            silent_clean_dir "$PHOTOS_DERIV" "Photos derivatives 缩略图缓存"
+        else
+            print_info "  已跳过"
+        fi
+    fi
+fi
+echo ""
+
+# 41. manicode 聊天历史缓存
+print_info "41. manicode 聊天历史缓存"
+MANICODE_CHATS="$HOME/.config/manicode/projects"
+if [ -d "$MANICODE_CHATS" ]; then
+    MANICODE_SIZE=$(get_size_bytes "$MANICODE_CHATS")
+    if [ "$MANICODE_SIZE" -gt 0 ]; then
+        echo -e "  ${CYAN}manicode 聊天历史缓存${NC}: $(format_size $MANICODE_SIZE)"
+        print_info "  聊天历史记录，删除后不影响 manicode 使用，只是丢失历史对话"
+        if confirm "  是否清理 manicode 聊天历史？"; then
+            silent_clean_dir "$MANICODE_CHATS" "manicode 聊天历史"
+        else
+            print_info "  已跳过"
+        fi
+    fi
+fi
+echo ""
+
+# 42. iMessage 缓存（保护 chat.db 聊天数据库）
+print_info "42. iMessage 缓存（保护 chat.db 聊天数据库）"
+IMESSAGE_CACHE="$HOME/Library/Messages/Caches"
+if [ -d "$IMESSAGE_CACHE" ]; then
+    IMESSAGE_SIZE=$(get_size_bytes "$IMESSAGE_CACHE")
+    if [ "$IMESSAGE_SIZE" -gt 0 ]; then
+        echo -e "  ${CYAN}iMessage 缓存${NC}: $(format_size $IMESSAGE_SIZE)"
+        print_info "  已保护：chat.db（聊天记录）、Attachments（附件）"
+        if confirm "  是否清理 iMessage 缓存？"; then
+            silent_clean_dir "$IMESSAGE_CACHE" "iMessage 缓存"
+        else
+            print_info "  已跳过"
+        fi
+    fi
+fi
+echo ""
+
+# 43. uv/tools 工具缓存
+print_info "43. uv/tools 工具缓存"
+UV_TOOLS="$HOME/.local/share/uv/tools"
+if [ -d "$UV_TOOLS" ]; then
+    UV_TOOLS_SIZE=$(get_size_bytes "$UV_TOOLS")
+    if [ "$UV_TOOLS_SIZE" -gt 0 ]; then
+        echo -e "  ${CYAN}uv/tools 工具缓存${NC}: $(format_size $UV_TOOLS_SIZE)"
+        print_info "  uv 安装的工具缓存，删除后可用 uv tool install 重新安装"
+        if confirm "  是否清理 uv/tools 工具缓存？"; then
+            silent_clean_dir "$UV_TOOLS" "uv/tools 工具缓存"
+        else
+            print_info "  已跳过"
+        fi
+    fi
+fi
+echo ""
+
+# 44. 诊断报告（崩溃报告，可安全删除）
+print_info "44. 诊断报告（崩溃报告）"
+DIAG_USER="$HOME/Library/Logs/DiagnosticReports"
+DIAG_SYS="/Library/Logs/DiagnosticReports"
+DIAG_CLEANABLE=0
+[ -d "$DIAG_USER" ] && DIAG_CLEANABLE=$((DIAG_CLEANABLE + $(get_size_bytes "$DIAG_USER")))
+[ -d "$DIAG_SYS" ] && DIAG_CLEANABLE=$((DIAG_CLEANABLE + $(get_size_bytes "$DIAG_SYS")))
+if [ "$DIAG_CLEANABLE" -gt 0 ]; then
+    echo -e "  ${CYAN}诊断报告（崩溃报告）${NC}: $(format_size $DIAG_CLEANABLE)"
+    if confirm "  是否清理诊断报告？"; then
+        silent_clean_dir "$DIAG_USER" "用户诊断报告"
+        if [ -d "$DIAG_SYS" ]; then
+            if [ "$DRY_RUN" -eq 1 ] 2>/dev/null; then
+                print_info "  演练模式：不清理系统诊断报告"
+            else
+                sudo find "$DIAG_SYS" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null
+                print_success "  系统诊断报告已清理"
+            fi
+        fi
+    else
+        print_info "  已跳过"
+    fi
+fi
+echo ""
+
+# 45. Codeium/Windsurf 非配置缓存（严格保护 MCP 配置和登录态）
+print_info "45. Codeium/Windsurf 非配置缓存（严格保护 MCP 配置）"
+CODEIUM_WS="$HOME/.codeium/windsurf"
+if [ -d "$CODEIUM_WS" ]; then
+    CODEIUM_CLEANABLE=0
+    for cd in "implicit" "code_tracker"; do
+        [ -d "$CODEIUM_WS/$cd" ] && CODEIUM_CLEANABLE=$((CODEIUM_CLEANABLE + $(get_size_bytes "$CODEIUM_WS/$cd")))
+    done
+    if [ "$CODEIUM_CLEANABLE" -gt 0 ]; then
+        echo -e "  ${CYAN}Codeium/Windsurf AI 索引缓存${NC}: $(format_size $CODEIUM_CLEANABLE)"
+        print_info "  已保护：mcp_config.json、cascade(对话历史)、memories、skills、installation_id、user_settings.pb"
+        if confirm "  是否清理 Codeium/Windsurf AI 索引缓存？"; then
+            for cd in "implicit" "code_tracker"; do
+                safe_remove_rebuildable_path "$CODEIUM_WS/$cd" "Windsurf $(basename "$cd") AI 索引缓存"
+            done
+            print_success "  Codeium/Windsurf AI 索引缓存清理完成"
+        else
+            print_info "  已跳过"
+        fi
+    else
+        print_info "  未检测到 Codeium/Windsurf 可清理缓存"
+    fi
 fi
 echo ""
 
