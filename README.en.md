@@ -84,7 +84,7 @@ docs, Electron storage behavior, and official PowerShell encoding guidance.
 ### macOS Launch
 
 ```bash
-git clone https://github.com/1837620622/devin.git
+git clone https://github.com/1837620622/devin-tools.git
 cd devin
 chmod +x fix-windsurf-mac.sh
 ./fix-windsurf-mac.sh
@@ -93,7 +93,7 @@ chmod +x fix-windsurf-mac.sh
 ### Linux Launch
 
 ```bash
-git clone https://github.com/1837620622/devin.git
+git clone https://github.com/1837620622/devin-tools.git
 cd devin
 chmod +x fix-windsurf-linux.sh
 ./fix-windsurf-linux.sh
@@ -102,7 +102,7 @@ chmod +x fix-windsurf-linux.sh
 ### Windows Launch
 
 ```powershell
-git clone https://github.com/1837620622/devin.git
+git clone https://github.com/1837620622/devin-tools.git
 cd devin
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 .\fix-windsurf-win.ps1
@@ -116,7 +116,7 @@ GitHub, VS Code, and cross-platform environments.
 ### macOS System Cleanup
 
 ```bash
-git clone https://github.com/1837620622/devin.git
+git clone https://github.com/1837620622/devin-tools.git
 cd devin
 chmod +x macos-safe-cleanup.sh
 ./macos-safe-cleanup.sh

@@ -13,7 +13,7 @@ fi
 # 针对你的系统定制，只清理可安全删除的缓存和临时文件
 # 不会清理：应用程序、用户文档、聊天记录、邮件、配置文件
 # 作者: 传康KK
-# GitHub: https://github.com/1837620622/devin
+# GitHub: https://github.com/1837620622/devin-tools
 # ============================================================================
 
 # 颜色定义
@@ -401,7 +401,7 @@ echo ""
 echo -e "${CYAN}============================================${NC}"
 echo -e "${CYAN}  macOS 系统数据安全清理工具${NC}"
 echo -e "${CYAN}  by 传康KK${NC}"
-echo -e "${CYAN}  github.com/1837620622/devin${NC}"
+echo -e "${CYAN}  github.com/1837620622/devin-tools${NC}"
 echo -e "${CYAN}============================================${NC}"
 echo ""
 print_warning "此脚本只清理缓存和临时文件，不会删除重要数据"
