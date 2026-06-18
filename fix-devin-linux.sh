@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # ============================================================================
-# Windsurf 修复工具 - Linux 版本
-# 用于修复 Windsurf IDE 卡顿、Shell无法连接等常见问题
-# 基于官方文档: https://docs.windsurf.com/troubleshooting/windsurf-common-issues
+# Devin 修复工具 - Linux 版本
+# 用于修复 Devin IDE 卡顿、Shell无法连接等常见问题
+# 基于官方文档: https://docs.devin.com/troubleshooting/devin-common-issues
 # 作者: 传康KK
-# GitHub: https://github.com/1837620622/windsurf-fix-tool
+# GitHub: https://github.com/1837620622/devin-fix-tool
 # ============================================================================
 
 # ----------------------------------------------------------------------------
@@ -22,13 +22,13 @@ NC='\033[0m'
 # 路径定义
 # ----------------------------------------------------------------------------
 CODEIUM_DIR="$HOME/.codeium"
-WINDSURF_DIR="$CODEIUM_DIR/windsurf"
-CASCADE_DIR="$WINDSURF_DIR/cascade"
-BACKUP_DIR="$HOME/.windsurf-backup-$(date +%Y%m%d_%H%M%S)"
+DEVIN_DIR="$CODEIUM_DIR/devin"
+CASCADE_DIR="$DEVIN_DIR/cascade"
+BACKUP_DIR="$HOME/.devin-backup-$(date +%Y%m%d_%H%M%S)"
 XDG_CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
 XDG_CACHE_ROOT="${XDG_CACHE_HOME:-$HOME/.cache}"
 XDG_DATA_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}"
-WINDSURF_CONFIG_DIR="$XDG_CONFIG_ROOT/Windsurf"
+DEVIN_CONFIG_DIR="$XDG_CONFIG_ROOT/Devin"
 CLAUDE_CODE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 CODEX_DIR="${CODEX_HOME:-$HOME/.codex}"
 if [ -n "$GEMINI_CLI_HOME" ]; then
@@ -44,11 +44,11 @@ OPENCODE_CONFIG_DIR="$XDG_CONFIG_ROOT/opencode"
 OPENCODE_CACHE_DIR="$XDG_CACHE_ROOT/opencode"
 OPENCODE_DATA_DIR="$XDG_DATA_ROOT/opencode"
 
-# 尝试查找Windsurf安装路径
-WINDSURF_BIN=""
-for path in "/opt/Windsurf" "/usr/share/windsurf" "$HOME/.local/share/windsurf" "/usr/local/bin/windsurf"; do
+# 尝试查找Devin安装路径
+DEVIN_BIN=""
+for path in "/opt/Devin" "/usr/share/devin" "$HOME/.local/share/devin" "/usr/local/bin/devin"; do
     if [ -e "$path" ]; then
-        WINDSURF_BIN="$path"
+        DEVIN_BIN="$path"
         break
     fi
 done
@@ -59,19 +59,19 @@ done
 print_header() {
     echo ""
     echo -e "${CYAN}========================================${NC}"
-    echo -e "${CYAN}  Windsurf 修复工具 - Linux${NC}"
+    echo -e "${CYAN}  Devin 修复工具 - Linux${NC}"
     echo -e "${CYAN}  by 传康KK${NC}"
-    echo -e "${CYAN}  github.com/1837620622/windsurf-fix-tool${NC}"
+    echo -e "${CYAN}  github.com/1837620622/devin-fix-tool${NC}"
     echo -e "${CYAN}========================================${NC}"
     echo ""
     # ── 运行模式提示 ─────────────────────────────────────────────────
     if [ "${FORCE_RESET_ID:-1}" = "0" ] || [ "${FORCE_RESET_ID:-1}" = "false" ]; then
         echo -e "${GREEN}[当前模式] 保守模式${NC}（FORCE_RESET_ID=0）——清理不重置设备 ID，保留登录态"
     else
-        echo -e "${RED}[当前模式] 强制重置模式${NC}（默认）——所有清理菜单完成后自动重置 Windsurf 设备 ID"
-        echo -e "  ${YELLOW}⚠ 重置后 Windsurf 会被识别为新设备，可能需要重新登录一次${NC}"
+        echo -e "${RED}[当前模式] 强制重置模式${NC}（默认）——所有清理菜单完成后自动重置 Devin 设备 ID"
+        echo -e "  ${YELLOW}⚠ 重置后 Devin 会被识别为新设备，可能需要重新登录一次${NC}"
         echo -e "  ${YELLOW}⚠ 用途：绕过限速、刷新免费额度、解决服务端缓存异常${NC}"
-        echo -e "  如需关闭强制重置：${CYAN}FORCE_RESET_ID=0 bash fix-windsurf-linux.sh${NC}"
+        echo -e "  如需关闭强制重置：${CYAN}FORCE_RESET_ID=0 bash fix-devin-linux.sh${NC}"
     fi
     echo ""
     echo -e "${GREEN}[始终保留]${NC} 对话和用户数据，任何模式下都不会被清理："
@@ -80,10 +80,10 @@ print_header() {
     echo -e "  • ${CYAN}~/.codeium/windsurf/skills/${NC}                   技能"
     echo -e "  • ${CYAN}~/.codeium/windsurf/mcp_config.json${NC}          MCP 配置"
     echo -e "  • ${CYAN}~/.codeium/windsurf/user_settings.pb${NC}          用户偏好"
-    echo -e "  • ${CYAN}~/.config/Windsurf/User/settings.json${NC}         编辑器设置"
+    echo -e "  • ${CYAN}~/.config/Devin/User/settings.json${NC}         编辑器设置"
     echo ""
     echo -e "${RED}[清理后会被强制重置]${NC} 仅在强制重置模式下（默认）："
-    echo -e "  • ${CYAN}installation_id${NC}                              Windsurf 安装标识"
+    echo -e "  • ${CYAN}installation_id${NC}                              Devin 安装标识"
     echo -e "  • ${CYAN}machineid${NC}                                    机器标识"
     echo -e "  • ${CYAN}storage.json${NC} 中的 telemetry.devDeviceId/macMachineId/machineId/sqmId"
     echo ""
@@ -138,38 +138,38 @@ detect_system_info() {
     echo -e "  发行版: ${GREEN}$DISTRO${NC}"
     echo -e "  内核版本: ${GREEN}$KERNEL${NC}"
     echo -e "  架构: ${GREEN}$ARCH${NC}"
-    if [ -n "$WINDSURF_BIN" ]; then
-        echo -e "  Windsurf路径: ${GREEN}$WINDSURF_BIN${NC}"
+    if [ -n "$DEVIN_BIN" ]; then
+        echo -e "  Devin路径: ${GREEN}$DEVIN_BIN${NC}"
     else
-        echo -e "  Windsurf路径: ${YELLOW}未检测到${NC}"
+        echo -e "  Devin路径: ${YELLOW}未检测到${NC}"
     fi
     echo ""
 }
 
 # ----------------------------------------------------------------------------
-# 检查Windsurf是否正在运行
+# 检查Devin是否正在运行
 # ----------------------------------------------------------------------------
-check_windsurf_running() {
-    if pgrep -f "windsurf" > /dev/null 2>&1; then
-        print_warning "检测到 Windsurf 正在运行"
-        echo -e "  请先关闭 Windsurf 再执行修复操作"
+check_devin_running() {
+    if pgrep -f "devin" > /dev/null 2>&1; then
+        print_warning "检测到 Devin 正在运行"
+        echo -e "  请先关闭 Devin 再执行修复操作"
         if [ "${TERM_PROGRAM:-}" = "vscode" ]; then
-            print_warning "当前看起来是在 Windsurf / VS Code 类内置终端中运行"
-            echo -e "  如果在这里自动关闭 Windsurf，当前终端会一起消失，看起来像脚本退出"
-            echo -e "  建议先手动关闭 Windsurf，再从系统终端重新运行脚本"
+            print_warning "当前看起来是在 Devin / VS Code 类内置终端中运行"
+            echo -e "  如果在这里自动关闭 Devin，当前终端会一起消失，看起来像脚本退出"
+            echo -e "  建议先手动关闭 Devin，再从系统终端重新运行脚本"
             return 1
         fi
-        echo -ne "${YELLOW}是否自动关闭Windsurf？[y/N]: ${NC}"
+        echo -ne "${YELLOW}是否自动关闭Devin？[y/N]: ${NC}"
         read -r choice
         case "$choice" in
             y|Y )
-                pkill -f "windsurf" 2>/dev/null || true
+                pkill -f "devin" 2>/dev/null || true
                 sleep 2
-                print_success "Windsurf 已关闭"
+                print_success "Devin 已关闭"
                 return 0
                 ;;
             * )
-                print_error "请手动关闭 Windsurf 后重试"
+                print_error "请手动关闭 Devin 后重试"
                 return 1
                 ;;
         esac
@@ -218,10 +218,10 @@ clean_extension_cache() {
 
         # 优先清理当前版本的运行时缓存目录，同时兼容旧版 .codeium 路径。
         for cache_dir in \
-            "$WINDSURF_CONFIG_DIR/CachedData" \
-            "$WINDSURF_CONFIG_DIR/CachedExtensionVSIXs" \
-            "$WINDSURF_DIR/CachedData" \
-            "$WINDSURF_DIR/CachedExtensions"; do
+            "$DEVIN_CONFIG_DIR/CachedData" \
+            "$DEVIN_CONFIG_DIR/CachedExtensionVSIXs" \
+            "$DEVIN_DIR/CachedData" \
+            "$DEVIN_DIR/CachedExtensions"; do
             if [ -d "$cache_dir" ]; then
                 rm -rf "$cache_dir"
                 print_success "已清理 $(basename "$cache_dir")"
@@ -249,12 +249,12 @@ fix_chrome_sandbox() {
     print_info "修复 chrome-sandbox 权限问题..."
     
     echo ""
-    echo "此问题通常导致 Windsurf 静默崩溃或无法启动"
+    echo "此问题通常导致 Devin 静默崩溃或无法启动"
     echo ""
     
     # 查找chrome-sandbox
     SANDBOX_PATH=""
-    for path in "/opt/Windsurf/chrome-sandbox" "/usr/share/windsurf/chrome-sandbox" "$HOME/.local/share/windsurf/chrome-sandbox"; do
+    for path in "/opt/Devin/chrome-sandbox" "/usr/share/devin/chrome-sandbox" "$HOME/.local/share/devin/chrome-sandbox"; do
         if [ -f "$path" ]; then
             SANDBOX_PATH="$path"
             break
@@ -263,7 +263,7 @@ fix_chrome_sandbox() {
     
     if [ -z "$SANDBOX_PATH" ]; then
         print_warning "未找到 chrome-sandbox 文件"
-        echo -ne "${YELLOW}请输入 Windsurf 安装路径: ${NC}"
+        echo -ne "${YELLOW}请输入 Devin 安装路径: ${NC}"
         read -r custom_path
         if [ -f "$custom_path/chrome-sandbox" ]; then
             SANDBOX_PATH="$custom_path/chrome-sandbox"
@@ -294,7 +294,7 @@ fix_chrome_sandbox() {
 configure_terminal_settings() {
     print_info "配置终端设置..."
     
-    SETTINGS_JSON="$HOME/.config/Windsurf/User/settings.json"
+    SETTINGS_JSON="$HOME/.config/Devin/User/settings.json"
     
     echo ""
     echo "推荐的终端配置:"
@@ -312,7 +312,7 @@ configure_terminal_settings() {
         fi
     else
         print_warning "未找到 settings.json 文件"
-        print_info "Windsurf 可能尚未创建配置文件"
+        print_info "Devin 可能尚未创建配置文件"
     fi
 }
 
@@ -334,14 +334,14 @@ fix_systemd_osc_context() {
         echo ""
         echo "建议解决方案:"
         echo "1. 修改 ~/.bashrc 避免 source /etc/bashrc"
-        echo "2. 创建专用于 Windsurf 的简化 shell 配置"
+        echo "2. 创建专用于 Devin 的简化 shell 配置"
         echo ""
         
-        echo -ne "${YELLOW}是否创建 Windsurf 专用的 bashrc？[y/N]: ${NC}"
+        echo -ne "${YELLOW}是否创建 Devin 专用的 bashrc？[y/N]: ${NC}"
         read -r choice
         case "$choice" in
             y|Y )
-                create_windsurf_bashrc
+                create_devin_bashrc
                 ;;
         esac
     else
@@ -357,14 +357,14 @@ fix_systemd_osc_context() {
 }
 
 # ----------------------------------------------------------------------------
-# 创建Windsurf专用bashrc
+# 创建Devin专用bashrc
 # ----------------------------------------------------------------------------
-create_windsurf_bashrc() {
-    WINDSURF_BASHRC="$HOME/.bashrc.windsurf"
+create_devin_bashrc() {
+    DEVIN_BASHRC="$HOME/.bashrc.devin"
     
-    cat > "$WINDSURF_BASHRC" << 'EOF'
+    cat > "$DEVIN_BASHRC" << 'EOF'
 # ============================================================================
-# Windsurf 专用 bash 配置
+# Devin 专用 bash 配置
 # 此配置避免加载可能干扰 Cascade 的系统脚本
 # ============================================================================
 
@@ -390,10 +390,10 @@ if [ -f /etc/bash_completion ]; then
 fi
 EOF
     
-    print_success "已创建 Windsurf 专用 bashrc: $WINDSURF_BASHRC"
+    print_success "已创建 Devin 专用 bashrc: $DEVIN_BASHRC"
     echo ""
-    print_info "使用方法: 在 Windsurf 设置中添加:"
-    echo '  "terminal.integrated.shellArgs.linux": ["--rcfile", "~/.bashrc.windsurf"]'
+    print_info "使用方法: 在 Devin 设置中添加:"
+    echo '  "terminal.integrated.shellArgs.linux": ["--rcfile", "~/.bashrc.devin"]'
 }
 
 # ----------------------------------------------------------------------------
@@ -416,25 +416,25 @@ clean_startup_cache() {
     echo ""
     
     if confirm_action; then
-        if ! check_windsurf_running; then
+        if ! check_devin_running; then
             return 1
         fi
         
         # 清理 GPU 缓存
-        CACHE_DIR="$WINDSURF_CONFIG_DIR/Cache"
+        CACHE_DIR="$DEVIN_CONFIG_DIR/Cache"
         if [ -d "$CACHE_DIR" ]; then
             rm -rf "$CACHE_DIR"
             print_success "已清理 Cache"
         fi
 
-        GPU_CACHE="$WINDSURF_CONFIG_DIR/GPUCache"
+        GPU_CACHE="$DEVIN_CONFIG_DIR/GPUCache"
         if [ -d "$GPU_CACHE" ]; then
             rm -rf "$GPU_CACHE"
             print_success "已清理 GPUCache"
         fi
         
         # 清理 CachedData
-        for cache_dir in "$WINDSURF_CONFIG_DIR/CachedData" "$WINDSURF_DIR/CachedData"; do
+        for cache_dir in "$DEVIN_CONFIG_DIR/CachedData" "$DEVIN_DIR/CachedData"; do
             if [ -d "$cache_dir" ]; then
                 rm -rf "$cache_dir"
                 print_success "已清理 $(basename "$cache_dir")"
@@ -442,7 +442,7 @@ clean_startup_cache() {
         done
 
         # 清理扩展安装包缓存，兼容旧版目录结构。
-        for cache_dir in "$WINDSURF_CONFIG_DIR/CachedExtensionVSIXs" "$WINDSURF_DIR/CachedExtensions"; do
+        for cache_dir in "$DEVIN_CONFIG_DIR/CachedExtensionVSIXs" "$DEVIN_DIR/CachedExtensions"; do
             if [ -d "$cache_dir" ]; then
                 rm -rf "$cache_dir"
                 print_success "已清理 $(basename "$cache_dir")"
@@ -450,13 +450,13 @@ clean_startup_cache() {
         done
         
         # 清理 Code Cache
-        CODE_CACHE="$WINDSURF_CONFIG_DIR/Code Cache"
+        CODE_CACHE="$DEVIN_CONFIG_DIR/Code Cache"
         if [ -d "$CODE_CACHE" ]; then
             rm -rf "$CODE_CACHE"
             print_success "已清理 Code Cache"
         fi
 
-        for cache_dir in "$WINDSURF_CONFIG_DIR/DawnWebGPUCache" "$WINDSURF_CONFIG_DIR/DawnGraphiteCache"; do
+        for cache_dir in "$DEVIN_CONFIG_DIR/DawnWebGPUCache" "$DEVIN_CONFIG_DIR/DawnGraphiteCache"; do
             if [ -d "$cache_dir" ]; then
                 rm -rf "$cache_dir"
                 print_success "已清理 $(basename "$cache_dir")"
@@ -464,7 +464,7 @@ clean_startup_cache() {
         done
         
         # 清理 logs
-        LOGS_DIR="$WINDSURF_CONFIG_DIR/logs"
+        LOGS_DIR="$DEVIN_CONFIG_DIR/logs"
         if [ -d "$LOGS_DIR" ]; then
             find "$LOGS_DIR" -type f -mtime +7 -delete 2>/dev/null
             print_success "已清理旧日志文件"
@@ -472,7 +472,7 @@ clean_startup_cache() {
         
         echo ""
         print_success "启动缓存清理完成！"
-        print_info "重启 Windsurf 后启动速度应该会改善"
+        print_info "重启 Devin 后启动速度应该会改善"
 
         # 清理完毕 -> 强制重置设备 ID（默认行为）
         auto_reset_after_clean
@@ -487,7 +487,7 @@ clean_startup_cache() {
 diagnose_mcp() {
     print_info "MCP (Model Context Protocol) 诊断..."
     
-    MCP_CONFIG="$WINDSURF_DIR/mcp_config.json"
+    MCP_CONFIG="$DEVIN_DIR/mcp_config.json"
     MCP_CONFIG_OLD="$CODEIUM_DIR/mcp_config.json"
     
     echo ""
@@ -553,7 +553,7 @@ diagnose_mcp() {
 reset_mcp_config() {
     print_info "重置 MCP 配置..."
     
-    MCP_CONFIG="$WINDSURF_DIR/mcp_config.json"
+    MCP_CONFIG="$DEVIN_DIR/mcp_config.json"
     
     echo ""
     print_warning "此操作将备份并重置 MCP 配置文件"
@@ -931,10 +931,10 @@ clean_system_caches() {
         TOTAL_SIZE=$((TOTAL_SIZE + SIZE))
     fi
     
-    # Windsurf 旧备份
+    # Devin 旧备份
     BACKUP_COUNT=0
     BACKUP_SIZE=0
-    for bdir in "$HOME"/.windsurf-backup-*; do
+    for bdir in "$HOME"/.devin-backup-*; do
         if [ -d "$bdir" ]; then
             BACKUP_COUNT=$((BACKUP_COUNT + 1))
             SIZE=$(du -sm "$bdir" 2>/dev/null | awk '{print $1}')
@@ -942,12 +942,12 @@ clean_system_caches() {
         fi
     done
     if [ $BACKUP_COUNT -gt 0 ]; then
-        echo -e "  ${GREEN}[Windsurf 旧备份]${NC} ${BACKUP_COUNT}个备份目录 - ${YELLOW}${BACKUP_SIZE}MB${NC}"
+        echo -e "  ${GREEN}[Devin 旧备份]${NC} ${BACKUP_COUNT}个备份目录 - ${YELLOW}${BACKUP_SIZE}MB${NC}"
         TOTAL_SIZE=$((TOTAL_SIZE + BACKUP_SIZE))
     fi
     
     # 旧诊断报告
-    DIAG_COUNT=$(ls "$HOME"/windsurf-diagnostic-*.txt 2>/dev/null | wc -l | tr -d ' ')
+    DIAG_COUNT=$(ls "$HOME"/devin-diagnostic-*.txt 2>/dev/null | wc -l | tr -d ' ')
     if [ "$DIAG_COUNT" -gt 0 ] 2>/dev/null; then
         echo -e "  ${GREEN}[旧诊断报告]${NC} ${DIAG_COUNT}个文件"
     fi
@@ -968,7 +968,7 @@ clean_system_caches() {
     echo "  1) 清理用户缓存 (~/.cache，排除关键缓存)"
     echo "  2) 清理旧日志文件（超过30天）"
     echo "  3) 清理 /tmp 临时文件（超过7天）"
-    echo "  4) 清理 Windsurf 旧备份目录"
+    echo "  4) 清理 Devin 旧备份目录"
     echo "  5) 清理旧诊断报告"
     echo "  6) 清理 systemd journal 日志（保留最近7天）"
     echo "  7) 刷新 DNS 缓存"
@@ -1000,17 +1000,17 @@ clean_system_caches() {
             ;;
         4)
             if [ $BACKUP_COUNT -gt 0 ]; then
-                print_info "将删除 ${BACKUP_COUNT} 个 Windsurf 旧备份目录"
+                print_info "将删除 ${BACKUP_COUNT} 个 Devin 旧备份目录"
                 if confirm_action; then
-                    rm -rf "$HOME"/.windsurf-backup-* 2>/dev/null
-                    print_success "Windsurf 旧备份已清理"
+                    rm -rf "$HOME"/.devin-backup-* 2>/dev/null
+                    print_success "Devin 旧备份已清理"
                 fi
             else
                 print_info "没有旧备份需要清理"
             fi
             ;;
         5)
-            rm -f "$HOME"/windsurf-diagnostic-*.txt 2>/dev/null
+            rm -f "$HOME"/devin-diagnostic-*.txt 2>/dev/null
             print_success "旧诊断报告已清理"
             ;;
         6)
@@ -1040,11 +1040,11 @@ clean_system_caches() {
             print_success "旧临时文件已清理"
             
             if [ $BACKUP_COUNT -gt 0 ]; then
-                rm -rf "$HOME"/.windsurf-backup-* 2>/dev/null
-                print_success "Windsurf 旧备份已清理"
+                rm -rf "$HOME"/.devin-backup-* 2>/dev/null
+                print_success "Devin 旧备份已清理"
             fi
             
-            rm -f "$HOME"/windsurf-diagnostic-*.txt 2>/dev/null
+            rm -f "$HOME"/devin-diagnostic-*.txt 2>/dev/null
             print_success "旧诊断报告已清理"
             
             if command -v journalctl &> /dev/null; then
@@ -1145,7 +1145,7 @@ detect_shell_theme_conflicts() {
     if [ $CONFLICTS_FOUND -eq 1 ]; then
         echo ""
         echo -e "${YELLOW}建议:${NC} 如果终端会话卡住，请尝试:"
-        echo "  1. 创建简化的 shell 配置专用于 Windsurf"
+        echo "  1. 创建简化的 shell 配置专用于 Devin"
         echo "  2. 临时注释掉复杂的主题配置"
     else
         print_success "未检测到已知的主题冲突"
@@ -1158,11 +1158,11 @@ detect_shell_theme_conflicts() {
 generate_diagnostic_report() {
     print_info "生成诊断报告..."
     
-    REPORT_FILE="$HOME/windsurf-diagnostic-$(date +%Y%m%d_%H%M%S).txt"
+    REPORT_FILE="$HOME/devin-diagnostic-$(date +%Y%m%d_%H%M%S).txt"
     
     {
         echo "=========================================="
-        echo "Windsurf 诊断报告 - Linux"
+        echo "Devin 诊断报告 - Linux"
         echo "生成时间: $(date)"
         echo "=========================================="
         echo ""
@@ -1175,8 +1175,8 @@ generate_diagnostic_report() {
         echo "架构: $(uname -m)"
         echo ""
         
-        echo "## Windsurf 安装状态"
-        which windsurf 2>/dev/null || echo "windsurf 不在 PATH 中"
+        echo "## Devin 安装状态"
+        which devin 2>/dev/null || echo "devin 不在 PATH 中"
         echo ""
         
         echo "## Codeium 目录状态"
@@ -1214,7 +1214,7 @@ generate_diagnostic_report() {
         echo ""
         
         echo "## chrome-sandbox 状态"
-        for path in "/opt/Windsurf/chrome-sandbox" "/usr/share/windsurf/chrome-sandbox"; do
+        for path in "/opt/Devin/chrome-sandbox" "/usr/share/devin/chrome-sandbox"; do
             if [ -f "$path" ]; then
                 ls -la "$path"
             fi
@@ -1234,7 +1234,7 @@ full_repair() {
     print_warning "此操作将执行所有修复步骤"
     
     if confirm_action; then
-        if ! check_windsurf_running; then
+        if ! check_devin_running; then
             return 1
         fi
         # 标记批量模式：子函数跳过各自的 auto_reset_after_clean
@@ -1260,7 +1260,7 @@ full_repair() {
 
         # 统一在完整修复末尾执行一次强制重置
         auto_reset_after_clean
-        print_info "请重新启动 Windsurf"
+        print_info "请重新启动 Devin"
     else
         print_info "已取消操作"
     fi
@@ -1435,8 +1435,8 @@ clean_dir_contents_with_stats() {
 # 计算当前可清理运行时缓存总大小（KB），用于前后对比
 # ----------------------------------------------------------------------------
 calculate_runtime_cache_total_kb() {
-    # Linux Windsurf 配置目录
-    LINUX_WS_CONFIG="$HOME/.config/Windsurf"
+    # Linux Devin 配置目录
+    LINUX_WS_CONFIG="$HOME/.config/Devin"
     TOTAL_KB=0
 
     for pattern in \
@@ -1450,9 +1450,9 @@ calculate_runtime_cache_total_kb() {
         "$LINUX_WS_CONFIG/Crashpad/completed/*" \
         "$LINUX_WS_CONFIG/Crashpad/pending/*" \
         "$LINUX_WS_CONFIG/CachedExtensionVSIXs/*" \
-        "$WINDSURF_DIR/implicit/*" \
-        "$WINDSURF_DIR/code_tracker/*" \
-        "/tmp/windsurf-terminal-*.snapshot"
+        "$DEVIN_DIR/implicit/*" \
+        "$DEVIN_DIR/code_tracker/*" \
+        "/tmp/devin-terminal-*.snapshot"
     do
         SIZE_KB=$(calculate_glob_size_kb "$pattern")
         TOTAL_KB=$((TOTAL_KB + SIZE_KB))
@@ -1770,7 +1770,7 @@ clean_ai_tool_garbage() {
         print_success "四个 AI 工具垃圾缓存清理完成，总释放空间: $(format_kb_size "$TOTAL_RELEASED_KB")"
         print_info "核心配置、MCP、登录认证、skills、history 和正式数据库均已保留"
 
-        # 清理完毕 -> 强制重置 Windsurf 设备 ID（默认行为）
+        # 清理完毕 -> 强制重置 Devin 设备 ID（默认行为）
         auto_reset_after_clean
     else
         print_info "未执行任何清理操作"
@@ -1778,14 +1778,14 @@ clean_ai_tool_garbage() {
 }
 
 # ----------------------------------------------------------------------------
-# 功能15: 深度清理运行时缓存（保留对话历史，解决Windsurf运行卡顿）
+# 功能15: 深度清理运行时缓存（保留对话历史，解决Devin运行卡顿）
 # ----------------------------------------------------------------------------
 deep_clean_runtime_cache() {
     AUTO_CONFIRM="$1"
-    # Linux Windsurf 配置目录
-    LINUX_WS_CONFIG="$HOME/.config/Windsurf"
-    IMPLICIT_LINUX="$WINDSURF_DIR/implicit"
-    CODE_TRACKER_LINUX="$WINDSURF_DIR/code_tracker"
+    # Linux Devin 配置目录
+    LINUX_WS_CONFIG="$HOME/.config/Devin"
+    IMPLICIT_LINUX="$DEVIN_DIR/implicit"
+    CODE_TRACKER_LINUX="$DEVIN_DIR/code_tracker"
 
     print_info "深度清理运行时缓存（保留对话历史）..."
 
@@ -1804,7 +1804,7 @@ deep_clean_runtime_cache() {
         print_info "已启用自动确认模式"
     fi
 
-    if ! check_windsurf_running; then
+    if ! check_devin_running; then
         return 1
     fi
     # 初始化全局释放空间计数器
@@ -1824,7 +1824,7 @@ deep_clean_runtime_cache() {
     clean_glob_with_stats "$LINUX_WS_CONFIG/CachedExtensionVSIXs/*"               "清理旧版插件安装包残留"
     clean_glob_with_stats "$IMPLICIT_LINUX/*"                                      "清理 implicit AI 索引缓存"
     clean_glob_with_stats "$CODE_TRACKER_LINUX/*"                                  "清理 AI 代码追踪索引 (code_tracker)"
-    clean_glob_with_stats "/tmp/windsurf-terminal-*.snapshot"                     "清理 /tmp 终端快照"
+    clean_glob_with_stats "/tmp/devin-terminal-*.snapshot"                     "清理 /tmp 终端快照"
 
     # 清理 bash 自动补全缓存（可解决终端卡顿）
     if compgen -G "$HOME/.bash_completion*" > /dev/null 2>&1; then
@@ -1845,16 +1845,16 @@ deep_clean_runtime_cache() {
 }
 
 # ----------------------------------------------------------------------------
-# 功能16: Windsurf 进程资源监控
+# 功能16: Devin 进程资源监控
 # ----------------------------------------------------------------------------
-monitor_windsurf_processes() {
-    print_info "Windsurf 进程资源监控..."
+monitor_devin_processes() {
+    print_info "Devin 进程资源监控..."
 
     echo ""
-    echo -e "${CYAN}========== Windsurf 进程 ==========${NC}"
+    echo -e "${CYAN}========== Devin 进程 ==========${NC}"
 
-    # 过滤出 windsurf 相关进程，排除本脚本自身
-    PROCESS_OUTPUT=$(ps aux | grep -i "[w]indsurf" | grep -v "fix-windsurf-linux.sh")
+    # 过滤出 devin 相关进程，排除本脚本自身
+    PROCESS_OUTPUT=$(ps aux | grep -i "[w]indsurf" | grep -v "fix-devin-linux.sh")
 
     if [ -n "$PROCESS_OUTPUT" ]; then
         printf "%-8s %-8s %-8s %s\n" "PID" "CPU%" "MEM%" "命令"
@@ -1864,7 +1864,7 @@ monitor_windsurf_processes() {
             printf "%-8s %-8s %-8s %s\n", $2, $3, $4, cmd
         }'
     else
-        print_warning "未检测到 Windsurf 正在运行"
+        print_warning "未检测到 Devin 正在运行"
     fi
 
     echo ""
@@ -1935,13 +1935,13 @@ backup_mcp_skills_rules() {
     print_info "备份 MCP 配置、Skills 和全局 Rules..."
 
     BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-    BACKUP_TARGET="$HOME/.windsurf-config-backup-$BACKUP_TIMESTAMP"
+    BACKUP_TARGET="$HOME/.devin-config-backup-$BACKUP_TIMESTAMP"
 
-    LINUX_WS_CONFIG="$HOME/.config/Windsurf"
-    MCP_CONFIG="$WINDSURF_DIR/mcp_config.json"
-    SKILLS_DIR="$WINDSURF_DIR/skills"
-    GLOBAL_RULES="$WINDSURF_DIR/memories/global_rules.md"
-    MEMORIES_DIR="$WINDSURF_DIR/memories"
+    LINUX_WS_CONFIG="$HOME/.config/Devin"
+    MCP_CONFIG="$DEVIN_DIR/mcp_config.json"
+    SKILLS_DIR="$DEVIN_DIR/skills"
+    GLOBAL_RULES="$DEVIN_DIR/memories/global_rules.md"
+    MEMORIES_DIR="$DEVIN_DIR/memories"
 
     echo ""
     echo -e "${CYAN}将备份以下内容:${NC}"
@@ -2019,7 +2019,7 @@ backup_mcp_skills_rules() {
 
         cat > "$BACKUP_TARGET/backup_info.txt" << BEOF
 ========================================
-Windsurf 配置备份信息
+Devin 配置备份信息
 ========================================
 备份时间: $(date)
 发行版: $(. /etc/os-release 2>/dev/null && echo "$NAME $VERSION_ID" || echo "Unknown")
@@ -2054,14 +2054,14 @@ BEOF
 restore_mcp_skills_rules() {
     print_info "还原 MCP 配置、Skills 和全局 Rules..."
 
-    LINUX_WS_CONFIG="$HOME/.config/Windsurf"
-    MCP_CONFIG="$WINDSURF_DIR/mcp_config.json"
-    SKILLS_DIR="$WINDSURF_DIR/skills"
-    GLOBAL_RULES="$WINDSURF_DIR/memories/global_rules.md"
-    MEMORIES_DIR="$WINDSURF_DIR/memories"
+    LINUX_WS_CONFIG="$HOME/.config/Devin"
+    MCP_CONFIG="$DEVIN_DIR/mcp_config.json"
+    SKILLS_DIR="$DEVIN_DIR/skills"
+    GLOBAL_RULES="$DEVIN_DIR/memories/global_rules.md"
+    MEMORIES_DIR="$DEVIN_DIR/memories"
 
     BACKUP_LIST=()
-    for bdir in "$HOME"/.windsurf-config-backup-*; do
+    for bdir in "$HOME"/.devin-config-backup-*; do
         if [ -d "$bdir" ]; then
             BACKUP_LIST+=("$bdir")
         fi
@@ -2081,7 +2081,7 @@ restore_mcp_skills_rules() {
     for bdir in "${BACKUP_LIST[@]}"; do
         BNAME=$(basename "$bdir")
         BSIZE=$(du -sh "$bdir" 2>/dev/null | awk '{print $1}')
-        BTIMESTAMP=$(echo "$BNAME" | sed 's/\.windsurf-config-backup-//')
+        BTIMESTAMP=$(echo "$BNAME" | sed 's/\.devin-config-backup-//')
 
         CONTENTS=""
         [ -f "$bdir/mcp_config.json" ] && CONTENTS="${CONTENTS}MCP "
@@ -2169,19 +2169,19 @@ restore_mcp_skills_rules() {
 
         echo ""
         print_success "还原完成！"
-        print_info "请重启 Windsurf 使更改生效"
+        print_info "请重启 Devin 使更改生效"
     else
         print_info "已取消操作"
     fi
 }
 
 # ----------------------------------------------------------------------------
-# 内部函数: 自动重置 Windsurf ID（无确认提示，供清理流程自动调用）
+# 内部函数: 自动重置 Devin ID（无确认提示，供清理流程自动调用）
 # ----------------------------------------------------------------------------
-reset_windsurf_id_auto() {
-    INSTALLATION_ID_FILE="$WINDSURF_DIR/installation_id"
-    MACHINE_ID_FILE="$HOME/.config/Windsurf/machineid"
-    STORAGE_JSON="$HOME/.config/Windsurf/User/globalStorage/storage.json"
+reset_devin_id_auto() {
+    INSTALLATION_ID_FILE="$DEVIN_DIR/installation_id"
+    MACHINE_ID_FILE="$HOME/.config/Devin/machineid"
+    STORAGE_JSON="$HOME/.config/Devin/User/globalStorage/storage.json"
 
     # 生成新的 UUID
     NEW_INSTALL_ID=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen 2>/dev/null || python3 -c "import uuid; print(uuid.uuid4())" 2>/dev/null)
@@ -2215,8 +2215,8 @@ PYEOF
     fi
 
     # 【关键补强】重置 state.vscdb 的 ItemTable 中的 telemetry 键
-    # VSCode/Windsurf 会把 telemetry 同时镜像到 SQLite 里，只改 storage.json 会被覆盖
-    STATE_DB="$HOME/.config/Windsurf/User/globalStorage/state.vscdb"
+    # VSCode/Devin 会把 telemetry 同时镜像到 SQLite 里，只改 storage.json 会被覆盖
+    STATE_DB="$HOME/.config/Devin/User/globalStorage/state.vscdb"
     if [ -f "$STATE_DB" ] && command -v sqlite3 &>/dev/null; then
         sqlite3 "$STATE_DB" <<SQLEOF 2>/dev/null
 UPDATE ItemTable SET value = '"$NEW_TELEMETRY_MACHINE_ID"' WHERE key = 'telemetry.machineId';
@@ -2228,11 +2228,11 @@ SQLEOF
     fi
 
     # 【Linux 补强】尝试刷新 /etc/machine-id（需要 root，失败则跳过）
-    # 说明：这是 systemd 层面的机器标识，Windsurf/Electron 不直接读，但某些 sdk 会用
+    # 说明：这是 systemd 层面的机器标识，Devin/Electron 不直接读，但某些 sdk 会用
     # 修改它影响面较大，仅在 --system 参数时执行（默认不动）
     # 此处不主动动 /etc/machine-id，以保守为主
 
-    print_success "Windsurf ID 已自动重置（含 storage.json + state.vscdb 同步）"
+    print_success "Devin ID 已自动重置（含 storage.json + state.vscdb 同步）"
     echo -e "  installation_id: ${GREEN}$NEW_INSTALL_ID${NC}"
     echo -e "  machineid:       ${GREEN}$NEW_MACHINE_ID${NC}"
     echo -e "  telemetry.*:     ${GREEN}已同步到 storage.json 和 state.vscdb${NC}"
@@ -2254,34 +2254,34 @@ auto_reset_after_clean() {
     fi
 
     echo ""
-    echo -e "${CYAN}================ 清理后强制重置 Windsurf 设备 ID ================${NC}"
+    echo -e "${CYAN}================ 清理后强制重置 Devin 设备 ID ================${NC}"
     print_warning "此为用户默认行为：每次清理完成后自动重置设备标识"
-    print_warning "预期影响：Windsurf 服务端会识别为新设备，可能需要重新登录一次"
-    print_info   "如需关闭此行为：下次运行前加 FORCE_RESET_ID=0 bash fix-windsurf-linux.sh"
+    print_warning "预期影响：Devin 服务端会识别为新设备，可能需要重新登录一次"
+    print_info   "如需关闭此行为：下次运行前加 FORCE_RESET_ID=0 bash fix-devin-linux.sh"
     echo ""
 
-    if pgrep -f "windsurf" &>/dev/null; then
-        print_warning "检测到 Windsurf 正在运行，建议先关闭再重置，以免 storage.json 被覆盖"
+    if pgrep -f "devin" &>/dev/null; then
+        print_warning "检测到 Devin 正在运行，建议先关闭再重置，以免 storage.json 被覆盖"
         print_info "将等待 3 秒后继续（Ctrl+C 可取消）..."
         sleep 3
     fi
 
-    reset_windsurf_id_auto
+    reset_devin_id_auto
     echo -e "${CYAN}================================================================${NC}"
 }
 
 # ----------------------------------------------------------------------------
-# 功能21: 重置 Windsurf ID
+# 功能21: 重置 Devin ID
 # ----------------------------------------------------------------------------
-reset_windsurf_id() {
-    print_info "重置 Windsurf ID..."
+reset_devin_id() {
+    print_info "重置 Devin ID..."
 
-    INSTALLATION_ID_FILE="$WINDSURF_DIR/installation_id"
-    MACHINE_ID_FILE="$HOME/.config/Windsurf/machineid"
-    STORAGE_JSON="$HOME/.config/Windsurf/User/globalStorage/storage.json"
+    INSTALLATION_ID_FILE="$DEVIN_DIR/installation_id"
+    MACHINE_ID_FILE="$HOME/.config/Devin/machineid"
+    STORAGE_JSON="$HOME/.config/Devin/User/globalStorage/storage.json"
 
     echo ""
-    echo -e "${CYAN}当前 Windsurf ID 信息:${NC}"
+    echo -e "${CYAN}当前 Devin ID 信息:${NC}"
     echo ""
 
     if [ -f "$INSTALLATION_ID_FILE" ]; then
@@ -2305,13 +2305,13 @@ reset_windsurf_id() {
     fi
 
     echo ""
-    print_warning "此操作将重新生成所有 Windsurf 标识 ID"
+    print_warning "此操作将重新生成所有 Devin 标识 ID"
     echo "  包括: installation_id, machineid, telemetry ID"
-    echo "  重置后 Windsurf 将被视为全新安装"
+    echo "  重置后 Devin 将被视为全新安装"
     echo ""
 
     if confirm_action; then
-        check_windsurf_running
+        check_devin_running
 
         NEW_INSTALL_ID=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen 2>/dev/null || python3 -c "import uuid; print(uuid.uuid4())" 2>/dev/null)
         NEW_MACHINE_ID=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen 2>/dev/null || python3 -c "import uuid; print(uuid.uuid4())" 2>/dev/null)
@@ -2369,8 +2369,8 @@ PYEOF
         echo -e "  telemetry.machineId:    ${GREEN}$NEW_TELEMETRY_MACHINE_ID${NC}"
         echo -e "  telemetry.sqmId:        ${GREEN}$NEW_SQM_ID${NC}"
         echo ""
-        print_success "Windsurf ID 重置完成！"
-        print_info "请重启 Windsurf 使更改生效"
+        print_success "Devin ID 重置完成！"
+        print_info "请重启 Devin 使更改生效"
     else
         print_info "已取消操作"
     fi
@@ -2383,7 +2383,7 @@ show_menu() {
     echo ""
     echo -e "${CYAN}请选择修复选项:${NC}"
     echo ""
-    echo -e "${YELLOW}== Windsurf 缓存清理 ==${NC}"
+    echo -e "${YELLOW}== Devin 缓存清理 ==${NC}"
     echo "  1) 清理 Cascade 缓存 (会清理对话历史)"
     echo "  2) 清理启动缓存 (不清理对话历史，推荐)"
     echo "  3) 清理扩展缓存 (不清理对话历史)"
@@ -2410,11 +2410,11 @@ show_menu() {
     echo -e "${YELLOW}== 配置备份与 ID 管理 ==${NC}"
     echo "  19) 备份 MCP 配置 / Skills / 全局 Rules"
     echo "  20) 还原 MCP 配置 / Skills / 全局 Rules"
-    echo "  21) 重置 Windsurf ID (重新生成所有标识)"
+    echo "  21) 重置 Devin ID (重新生成所有标识)"
     echo ""
     echo -e "${YELLOW}== 深度优化 ==${NC}"
     echo "  15) 深度清理运行时缓存 (保留对话历史，推荐)"
-    echo "  16) Windsurf 进程资源监控"
+    echo "  16) Devin 进程资源监控"
     echo "  17) 一键智能优化 (保留对话历史)"
     echo ""
     echo -e "${YELLOW}== AI 工具清理 ==${NC}"
@@ -2426,9 +2426,9 @@ show_menu() {
     read -r choice
     
     case $choice in
-        1) if check_windsurf_running; then clean_cascade_cache; fi ;;
+        1) if check_devin_running; then clean_cascade_cache; fi ;;
         2) clean_startup_cache ;;
-        3) if check_windsurf_running; then clean_extension_cache; fi ;;
+        3) if check_devin_running; then clean_extension_cache; fi ;;
         4) clean_dev_caches ;;
         5) clean_system_caches ;;
         6) analyze_disk_usage ;;
@@ -2441,15 +2441,15 @@ show_menu() {
         13) generate_diagnostic_report ;;
         14) full_repair ;;
         15) deep_clean_runtime_cache ;;
-        16) monitor_windsurf_processes ;;
+        16) monitor_devin_processes ;;
         17) smart_optimize ;;
         18) clean_ai_tool_garbage ;;
         19) backup_mcp_skills_rules ;;
         20) restore_mcp_skills_rules ;;
-        21) reset_windsurf_id ;;
+        21) reset_devin_id ;;
         0) 
             echo ""
-            print_info "感谢使用 Windsurf 修复工具"
+            print_info "感谢使用 Devin 修复工具"
             exit 0 
             ;;
         *) 
